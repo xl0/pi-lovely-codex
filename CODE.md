@@ -4,15 +4,15 @@
 Pi extension package for Codex/GPT service-tier controls.
 
 ## Package
-- `package.json`: npm/pi package manifest. Pi loads `./extensions` via `package.json#pi.extensions`.
+- `package.json`: npm/pi package manifest with Pi/Codex/GPT/OpenAI/service-tier keywords. Pi loads `./extensions` via `package.json#pi.extensions`.
 - Published files: `extensions/`, `README.md`, `LICENSE`.
 - Runtime dependencies: none.
 - Peer deps require Pi packages; dev deps provide TypeScript/Biome tooling.
 
 ## Extension
-- `extensions/lovely-codex/index.ts`: Pi entrypoint. Owns in-memory merged config closure, refreshes it on `session_start`, and registers `/codex` plus GPT mode hooks.
-- `extensions/lovely-codex/config.ts`: TypeBox-validated config helpers. Loads global `~/.pi/agent/xl0-pi-lovely-codex.json` then project `.pi/xl0-pi-lovely-codex.json`, with project overriding global. Config shape: `{ "gptMode": "default" | "fast" | "fast-codex" }`; default is `default`.
-- `extensions/lovely-codex/command.ts`: `/codex` command. Selects global/project scope, then shows one `SettingsList` item for GPT mode. `/codex default`, `/codex fast`, and `/codex fast-codex` save directly after scope selection and refresh in-memory merged config.
+- `extensions/lovely-codex/index.ts`: Pi entrypoint. Owns in-memory config by scope (`global`/`project`), refreshes both on `session_start`, and registers `/codex` plus GPT mode hooks. Hooks merge scopes on read, with project overriding global. Invalid config reload fails closed to default and clears status. Non-default mode sets a `lovely-codex` status indicator (`🏎️`); default clears it.
+- `extensions/lovely-codex/config.ts`: TypeBox-validated config helpers. Provides config paths, scoped loading, merge helper, and file read/write. Config shape: `{ "gptMode": "default" | "fast" | "fast-codex" }`; omitted `gptMode` means unset; default fallback is `default`.
+- `extensions/lovely-codex/command.ts`: `/codex` command. Takes no args. TUI shows tabbed `User` (global) and `Workspace` (project) scopes with one `GPT mode` setting row cycling through `unset`, `default`, `fast`, and `fast-codex`. Notes beside the row show Workspace overrides, User inheritance, or default fallback. Writes only active scope and updates both in-memory scopes. Bad scoped config shows a warning and only that scope starts empty.
 - `extensions/lovely-codex/gpt-mode.ts`: request hooks for OpenAI GPT models (`provider` `openai`/`openai-codex`, model id `gpt-*`). Reads current mode from the config closure. `before_provider_request` injects `service_tier: "priority"` only when enabled; `default` omits the field, `fast` prioritizes both providers, `fast-codex` only `openai-codex`. `message_end` checks current mode and adjusts priority cost for `openai-codex` assistant messages.
 
 ## Tooling
