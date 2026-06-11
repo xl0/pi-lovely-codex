@@ -1,9 +1,12 @@
 {
 	"name": "@xl0/pi-lovely-codex",
-	"version": "0.0.0",
-	"description": "Pi extension package for Codex/GPT service-tier controls.",
+	"version": "0.0.1",
+	"description": "Pi extension package for better experience with GPT models / Codex sub",
 	"keywords": [
-		"pi-package"
+		"pi-package",
+		"codex",
+		"gpt",
+		"openai"
 	],
 	"type": "module",
 	"license": "MIT",

@@ -1,76 +1,194 @@
-import { homedir } from "node:os"
-import { join, resolve } from "node:path"
-import { type ExtensionAPI, getSettingsListTheme } from "@earendil-works/pi-coding-agent"
-import { Container, type SettingItem, SettingsList, Text } from "@earendil-works/pi-tui"
-import { CONFIG_FILE_NAME, type GptMode, getGptMode, readConfigFile, writeConfigFile } from "./config.js"
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
+import { Key, matchesKey, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui"
+import {
+	CONFIG_FILE_NAME,
+	type CodexConfig,
+	type ConfigScope,
+	DEFAULT_GPT_MODE,
+	type GptMode,
+	getConfigPath,
+	readConfigFile,
+	type ScopedCodexConfig,
+	writeConfigFile
+} from "./config.js"
 
-function modeFromArgs(args: string): GptMode | undefined {
-	const mode = args.trim().split(/\s+/, 1)[0]
-	return mode === "default" || mode === "fast" || mode === "fast-codex" ? mode : undefined
+type GptModeSetting = GptMode | "unset"
+
+const scopeTabs: Array<{ scope: ConfigScope; label: string; path: string }> = [
+	{ scope: "global", label: "User", path: `~/.pi/agent/${CONFIG_FILE_NAME}` },
+	{ scope: "project", label: "Workspace", path: `.pi/${CONFIG_FILE_NAME}` }
+]
+
+const gptModeOptions: Array<{ value: GptModeSetting; label: string }> = [
+	{ value: "unset", label: "unset" },
+	{ value: "default", label: "default" },
+	{ value: "fast", label: "fast" },
+	{ value: "fast-codex", label: "fast-codex" }
+]
+
+function getScopedGptMode(config: CodexConfig): GptModeSetting {
+	return config.gptMode ?? "unset"
 }
 
-export function registerCodexCommand(pi: ExtensionAPI, refreshConfig: (cwd: string) => void) {
+function withGptMode(config: CodexConfig, mode: GptModeSetting): CodexConfig {
+	const next = { ...config }
+	if (mode === "unset") {
+		delete next.gptMode
+	} else {
+		next.gptMode = mode
+	}
+	return next
+}
+
+function nextGptMode(mode: GptModeSetting): GptModeSetting {
+	const index = gptModeOptions.findIndex(option => option.value === mode)
+	return gptModeOptions[(index + 1) % gptModeOptions.length]?.value ?? "unset"
+}
+
+function getScopeNote(scope: ConfigScope, configs: ScopedCodexConfig): string | undefined {
+	const userMode = configs.global.gptMode
+	const workspaceMode = configs.project.gptMode
+	if (!userMode && !workspaceMode) return `uses default: ${DEFAULT_GPT_MODE}`
+
+	if (scope === "global") {
+		if (userMode && workspaceMode) return `Workspace overrides with: ${workspaceMode}`
+		if (!userMode && workspaceMode) return `Workspace sets: ${workspaceMode}`
+		return undefined
+	}
+
+	if (!workspaceMode && userMode) return `inherits User: ${userMode}`
+	if (workspaceMode && userMode) return workspaceMode === userMode ? `same as User: ${userMode}` : `overrides User: ${userMode}`
+	if (workspaceMode && !userMode) return `overrides default: ${DEFAULT_GPT_MODE}`
+	return undefined
+}
+
+function loadCommandConfig(ctx: ExtensionContext): ScopedCodexConfig {
+	const config: ScopedCodexConfig = { global: {}, project: {} }
+	for (const scope of ["global", "project"] as const) {
+		const path = getConfigPath(scope, ctx.cwd)
+		try {
+			config[scope] = readConfigFile(path)
+		} catch (error) {
+			ctx.ui.notify(`Lovely Codex ignored bad ${scope === "global" ? "User" : "Workspace"} config at ${path}: ${error instanceof Error ? error.message : String(error)}`, "warning")
+		}
+	}
+	return config
+}
+
+export function registerCodexCommand(pi: ExtensionAPI, setConfigByScope: (config: ScopedCodexConfig, ctx: ExtensionContext) => GptMode) {
 	pi.registerCommand("codex", {
 		description: "Configure Lovely Codex GPT mode",
-		async handler(args, ctx) {
-			if (!ctx.hasUI) {
-				ctx.ui.notify("The /codex command is only available in interactive mode.", "warning")
+		async handler(_args, ctx) {
+			let configs = loadCommandConfig(ctx)
+
+			if (ctx.mode !== "tui") {
+				ctx.ui.notify("The interactive /codex settings UI is only available in TUI mode.", "warning")
 				return
 			}
 
-			const scope = await ctx.ui.select("Config scope:", ["Global (~/.pi/agent/)", "Project (.pi/)"])
-			if (scope === undefined) return
+			await ctx.ui.custom<void>((tui, theme, _keybindings, done) => {
+				let currentTab = 0
 
-			const configPath = scope.startsWith("Global")
-				? join(homedir(), ".pi", "agent", CONFIG_FILE_NAME)
-				: resolve(ctx.cwd, ".pi", CONFIG_FILE_NAME)
+				function currentScope(): ConfigScope {
+					return scopeTabs[currentTab]?.scope ?? "global"
+				}
 
-			let config: ReturnType<typeof readConfigFile>
-			try {
-				config = readConfigFile(configPath)
-			} catch (error) {
-				ctx.ui.notify(error instanceof Error ? error.message : String(error), "error")
-				return
-			}
+				function refresh() {
+					tui.requestRender()
+				}
 
-			const argMode = modeFromArgs(args)
-			if (argMode) {
-				config.gptMode = argMode
-				writeConfigFile(configPath, config)
-				refreshConfig(ctx.cwd)
-				ctx.ui.notify(`Lovely Codex GPT mode: ${argMode}`, "info")
-				return
-			}
+				function switchTab(nextTab: number) {
+					currentTab = (nextTab + scopeTabs.length) % scopeTabs.length
+					refresh()
+				}
 
-			await ctx.ui.custom((_tui, theme, _keybindings, done) => {
-				const items: SettingItem[] = [
-					{
-						id: "gpt-mode",
-						label: "GPT mode",
-						currentValue: getGptMode(config),
-						description:
-							"default uses default service tier; fast uses priority for all OpenAI GPT; fast-codex uses priority only for Codex sub.",
-						values: ["default", "fast", "fast-codex"]
+				function save(scope: ConfigScope, mode: GptModeSetting) {
+					const config = withGptMode(configs[scope], mode)
+					configs = { ...configs, [scope]: config }
+					writeConfigFile(getConfigPath(scope, ctx.cwd), config)
+					setConfigByScope(configs, ctx)
+					refresh()
+				}
+
+				function handleInput(data: string) {
+					if (matchesKey(data, Key.tab) || matchesKey(data, Key.right)) {
+						switchTab(currentTab + 1)
+						return
 					}
-				]
-				const container = new Container()
-				container.addChild(new Text(theme.fg("accent", theme.bold("Lovely Codex")), 1, 1))
-				const list = new SettingsList(
-					items,
-					items.length,
-					getSettingsListTheme(),
-					(_id, newValue) => {
-						config.gptMode = newValue as GptMode
-						writeConfigFile(configPath, config)
-						refreshConfig(ctx.cwd)
-					},
-					() => done(undefined)
-				)
-				container.addChild(list)
+					if (matchesKey(data, Key.shift("tab")) || matchesKey(data, Key.left)) {
+						switchTab(currentTab - 1)
+						return
+					}
+					if (matchesKey(data, Key.enter) || data === " ") {
+						const scope = currentScope()
+						save(scope, nextGptMode(getScopedGptMode(configs[scope])))
+						return
+					}
+					if (matchesKey(data, Key.escape)) {
+						done(undefined)
+					}
+				}
+
+				function render(width: number): string[] {
+					const lines: string[] = []
+					const renderWidth = Math.max(1, width)
+					const scope = currentScope()
+					const activeConfig = configs[scope]
+					const rawMode = getScopedGptMode(activeConfig)
+					const note = getScopeNote(scope, configs)
+					function addWrapped(text: string) {
+						lines.push(...wrapTextWithAnsi(text, renderWidth))
+					}
+
+					function addWrappedWithPrefix(prefix: string, text: string) {
+						const prefixWidth = visibleWidth(prefix)
+						if (prefixWidth >= renderWidth) {
+							addWrapped(prefix + text)
+							return
+						}
+						const wrapped = wrapTextWithAnsi(text, renderWidth - prefixWidth)
+						const continuationPrefix = " ".repeat(prefixWidth)
+						for (let i = 0; i < wrapped.length; i++) {
+							lines.push(`${i === 0 ? prefix : continuationPrefix}${wrapped[i]}`)
+						}
+					}
+
+					lines.push(theme.fg("accent", "─".repeat(renderWidth)))
+
+					const tabs: string[] = ["← "]
+					for (const [index, tab] of scopeTabs.entries()) {
+						const mode = getScopedGptMode(configs[tab.scope])
+						const marker = mode === "unset" ? "□" : "■"
+						const text = ` ${marker} ${tab.label} `
+						const styled =
+							index === currentTab ? theme.bg("selectedBg", theme.fg("text", text)) : theme.fg(mode === "unset" ? "muted" : "success", text)
+						tabs.push(`${styled} `)
+					}
+					tabs.push("→")
+					addWrappedWithPrefix(" ", tabs.join(""))
+					lines.push("")
+
+					const tab = scopeTabs[currentTab]
+					if (tab) {
+						addWrappedWithPrefix(" ", `${theme.fg("accent", theme.bold(`${tab.label} config`))} ${theme.fg("dim", tab.path)}`)
+					}
+					lines.push("")
+
+					const settingValue = theme.fg(rawMode === "unset" ? "muted" : "accent", rawMode)
+					const settingNote = note ? ` ${theme.fg("muted", `(${note})`)}` : ""
+					addWrappedWithPrefix(theme.fg("accent", "> "), `${theme.fg("text", "GPT mode")}  ${settingValue}${settingNote}`)
+
+					lines.push("")
+					addWrappedWithPrefix(" ", theme.fg("dim", "Tab/←→ switch scope • Enter/Space change • Esc close"))
+					lines.push(theme.fg("accent", "─".repeat(renderWidth)))
+
+					return lines
+				}
+
 				return {
-					render: (width: number) => container.render(width),
-					invalidate: () => container.invalidate(),
-					handleInput: (data: string) => list.handleInput(data)
+					render,
+					invalidate: () => {},
+					handleInput
 				}
 			})
 		}

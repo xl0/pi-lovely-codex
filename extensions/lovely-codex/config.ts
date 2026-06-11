@@ -15,15 +15,30 @@ const codexConfigValidator = Schema.Compile(codexConfigSchema)
 
 export type CodexConfig = Static<typeof codexConfigSchema>
 export type GptMode = NonNullable<CodexConfig["gptMode"]>
+export type ConfigScope = "global" | "project"
+export type ScopedCodexConfig = Record<ConfigScope, CodexConfig>
 
 export function getGptMode(config: CodexConfig): GptMode {
 	return config.gptMode ?? DEFAULT_GPT_MODE
 }
 
+export function getConfigPath(scope: ConfigScope, cwd: string): string {
+	return scope === "global" ? join(homedir(), ".pi", "agent", CONFIG_FILE_NAME) : resolve(cwd, ".pi", CONFIG_FILE_NAME)
+}
+
+export function mergeConfig(config: ScopedCodexConfig): CodexConfig {
+	return { ...config.global, ...config.project }
+}
+
+export function loadScopedConfig(cwd: string): ScopedCodexConfig {
+	return {
+		global: readConfigFile(getConfigPath("global", cwd)),
+		project: readConfigFile(getConfigPath("project", cwd))
+	}
+}
+
 export function loadConfig(cwd: string): CodexConfig {
-	const global = readConfigFile(join(homedir(), ".pi", "agent", CONFIG_FILE_NAME))
-	const project = readConfigFile(resolve(cwd, ".pi", CONFIG_FILE_NAME))
-	return { ...global, ...project }
+	return mergeConfig(loadScopedConfig(cwd))
 }
 
 export function readConfigFile(path: string): CodexConfig {
