@@ -1,7 +1,7 @@
 # Code
 
 ## Purpose
-Bare Pi extension package skeleton for `@xl0/pi-lovely-codex`.
+Pi extension package for Codex/GPT service-tier controls.
 
 ## Package
 - `package.json`: npm/pi package manifest. Pi loads `./extensions` via `package.json#pi.extensions`.
@@ -10,7 +10,10 @@ Bare Pi extension package skeleton for `@xl0/pi-lovely-codex`.
 - Peer deps require Pi packages; dev deps provide TypeScript/Biome tooling.
 
 ## Extension
-- `extensions/lovely-codex/index.ts`: empty Pi extension entrypoint. Imports `ExtensionAPI` type and exports a default factory with no registered tools, commands, events, or UI.
+- `extensions/lovely-codex/index.ts`: Pi entrypoint. Owns in-memory merged config closure, refreshes it on `session_start`, and registers `/codex` plus GPT mode hooks.
+- `extensions/lovely-codex/config.ts`: TypeBox-validated config helpers. Loads global `~/.pi/agent/xl0-pi-lovely-codex.json` then project `.pi/xl0-pi-lovely-codex.json`, with project overriding global. Config shape: `{ "gptMode": "default" | "fast" | "fast-codex" }`; default is `default`.
+- `extensions/lovely-codex/command.ts`: `/codex` command. Selects global/project scope, then shows one `SettingsList` item for GPT mode. `/codex default`, `/codex fast`, and `/codex fast-codex` save directly after scope selection and refresh in-memory merged config.
+- `extensions/lovely-codex/gpt-mode.ts`: request hooks for OpenAI GPT models (`provider` `openai`/`openai-codex`, model id `gpt-*`). Reads current mode from the config closure. `before_provider_request` injects `service_tier: "priority"` only when enabled; `default` omits the field, `fast` prioritizes both providers, `fast-codex` only `openai-codex`. `message_end` checks current mode and adjusts priority cost for `openai-codex` assistant messages.
 
 ## Tooling
 - `tsconfig.json`: strict TypeScript config for `extensions/`.

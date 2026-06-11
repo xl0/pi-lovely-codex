@@ -1,7 +1,7 @@
 {
 	"name": "@xl0/pi-lovely-codex",
 	"version": "0.0.0",
-	"description": "Bare Pi extension package skeleton.",
+	"description": "Pi extension package for Codex/GPT service-tier controls.",
 	"keywords": [
 		"pi-package"
 	],
