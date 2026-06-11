@@ -1,0 +1,47 @@
+{
+	"name": "@xl0/pi-lovely-codex",
+	"version": "0.0.0",
+	"description": "Bare Pi extension package skeleton.",
+	"keywords": [
+		"pi-package"
+	],
+	"type": "module",
+	"license": "MIT",
+	"homepage": "https://github.com/xl0/pi-lovely-codex#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/xl0/pi-lovely-codex.git"
+	},
+	"files": [
+		"extensions/",
+		"README.md",
+		"LICENSE"
+	],
+	"scripts": {
+		"typecheck": "tsgo --noEmit",
+		"check": "bun run typecheck && bun run biome:check",
+		"release": "bun publish --access public",
+		"lint": "biome lint .",
+		"format": "biome format --write .",
+		"format:check": "biome format .",
+		"biome:check": "biome check ."
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.14",
+		"@typescript/native-preview": "^7.0.0-dev.20260502.1",
+		"bun-types": "^1.3.13",
+		"typescript": "^6.0.3"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-ai": "*",
+		"@earendil-works/pi-coding-agent": "*",
+		"@earendil-works/pi-tui": "*",
+		"typebox": "*"
+	},
+	"pi": {
+		"extensions": [
+			"./extensions"
+		]
+	}
+}
