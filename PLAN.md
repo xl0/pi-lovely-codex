@@ -17,3 +17,6 @@
 - [x] Add no-arg `/codex` tabbed User/Workspace mode config command with unset support.
 - [x] Inject GPT service-tier payload from config.
 - [x] Adjust Codex cost for priority mode.
+- [x] Add Codex-backed `apply_patch` black-box test harness.
+- [x] Copy upstream scenario fixtures into repo.
+- [ ] Add Pi `apply_patch` runner to same harness.
