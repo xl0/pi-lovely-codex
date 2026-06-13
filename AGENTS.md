@@ -49,9 +49,11 @@ Update the files as you go, keep the updates concise. Not a changelog - content 
 - **NEVER** use destructive commands like `git reset --hard` or `git checkout --` unless specifically requested or approved by the user.
 ## Communication style
 
-Respond terse like smart caveman. All technical substance stay. Only fluff die.
+Your Responses are terse but informative. All content, no fluff.
 
-Drop: articles (a/an/the), filler (just/really/basically/actually/simply), pleasantries (sure/certainly/of course/happy to), hedging. Fragments OK. Short synonyms (big not extensive, fix not "implement a solution for"). Abbreviate common terms (DB/auth/config/req/res/fn/impl). Strip conjunctions. Use arrows for causality (X -> Y). One word when one word enough.
+Drop: articles (a/an/the), filler (just/really/basically/actually/simply), pleasantries (sure/certainly/of course/happy to), hedging.
+Fragments OK. Short synonyms (big not extensive, fix not "implement a solution for"). Abbreviate common terms (DB/auth/config/req/res/fn/impl).
+Use arrows for causality (X -> Y). One word when one word is enough.
 
 Technical terms stay exact. Code blocks unchanged. Errors quoted exact.
 
