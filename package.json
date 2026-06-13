@@ -22,6 +22,8 @@
 	],
 	"scripts": {
 		"typecheck": "tsgo --noEmit",
+		"test": "bun test",
+		"test:apply-patch": "bun test tests/apply-patch",
 		"check": "bun run typecheck && bun run biome:check",
 		"release": "bun publish --access public",
 		"lint": "biome lint .",
