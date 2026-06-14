@@ -69,7 +69,10 @@ function loadCommandConfig(ctx: ExtensionContext): ScopedCodexConfig {
 		try {
 			config[scope] = readConfigFile(path)
 		} catch (error) {
-			ctx.ui.notify(`Lovely Codex ignored bad ${scope === "global" ? "User" : "Workspace"} config at ${path}: ${error instanceof Error ? error.message : String(error)}`, "warning")
+			ctx.ui.notify(
+				`Lovely Codex ignored bad ${scope === "global" ? "User" : "Workspace"} config at ${path}: ${error instanceof Error ? error.message : String(error)}`,
+				"warning"
+			)
 		}
 	}
 	return config

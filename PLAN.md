@@ -8,6 +8,7 @@
 - GPT modes map to OpenAI service tiers: `default` -> omit service tier, `fast` -> priority for `openai` and `openai-codex`, `fast-codex` -> priority only for `openai-codex`.
 - Apply service-tier payload only to OpenAI GPT models (`provider` `openai`/`openai-codex`, id starts `gpt-`) to avoid breaking other OpenAI-compatible providers.
 - Adjust priority pricing on finalized `openai-codex` assistant messages; normal OpenAI provider responses keep native provider pricing behavior.
+- `docs/APPLY_PATCH_REPORT.md` captures source review of existing Pi-native `apply_patch`; use as reference when replacing current wrapper.
 
 ## Todo
 - [x] Add package manifest and Pi extension entry.
@@ -19,4 +20,5 @@
 - [x] Adjust Codex cost for priority mode.
 - [x] Add Codex-backed `apply_patch` black-box test harness.
 - [x] Copy upstream scenario fixtures into repo.
-- [ ] Add Pi `apply_patch` runner to same harness.
+- [x] Add Pi `apply_patch` runner to same harness.
+- [ ] Replace Codex-wrapper `apply_patch` with native Pi implementation.
