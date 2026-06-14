@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
+import { registerApplyPatchTool } from "./apply-patch.js"
 import { registerCodexCommand } from "./command.js"
 import { getGptMode, loadScopedConfig, mergeConfig, type ScopedCodexConfig } from "./config.js"
 import { registerGptModeHooks } from "./gpt-mode.js"
@@ -32,4 +33,5 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 
 	registerCodexCommand(pi, setConfigByScope)
 	registerGptModeHooks(pi, getMode)
+	registerApplyPatchTool(pi)
 }

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process"
+import { runCodexApplyPatch } from "../../extensions/lovely-codex/apply-patch"
 
 export type RunResult = {
 	exitCode: number
@@ -43,4 +44,16 @@ export const codexRunner: Runner = {
 	}
 }
 
-export const runners = [codexRunner]
+export const piCodexWrapperRunner: Runner = {
+	name: "pi-codex-wrapper",
+	async run(cwd, patch) {
+		const result = await runCodexApplyPatch(cwd, patch)
+		return {
+			exitCode: result.exitCode,
+			stdout: result.stdout,
+			stderr: result.stderr
+		}
+	}
+}
+
+export const runners = [codexRunner, piCodexWrapperRunner]
