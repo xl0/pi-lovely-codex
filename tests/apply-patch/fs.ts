@@ -51,6 +51,7 @@ async function snapshotInto(base: string, dir: string, snapshot: Map<string, Sna
 		if ((error as NodeJS.ErrnoException).code === "ENOENT") return
 		throw error
 	}
+	entries.sort((a, b) => a.name.localeCompare(b.name))
 	for (const entry of entries) {
 		const path = join(dir, entry.name)
 		const rel = relative(base, path)
