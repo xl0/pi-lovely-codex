@@ -130,12 +130,15 @@ const applyPatchTool = defineTool({
 	name: "apply_patch",
 	label: "apply_patch",
 	description:
-		"Apply file edits using Codex apply_patch format. Pass single `input` string containing full patch envelope starting with *** Begin Patch and ending with *** End Patch.",
-	promptSnippet: "Apply file edits via Codex apply_patch patch string in input arg",
+		"Use the `apply_patch` tool to edit files using Codex apply_patch format. Pass a single `input` string containing the full patch envelope starting with *** Begin Patch and ending with *** End Patch.",
+	promptSnippet: "Use apply_patch to edit files via Codex apply_patch format",
 	promptGuidelines: [
-		"Use apply_patch for multi-file or multi-hunk edits when precise patch format is convenient.",
-		"Pass patch text in single input arg. Do not wrap patch in JSON string inside string.",
-		"Always include full patch envelope with *** Begin Patch and *** End Patch."
+		"Use apply_patch for text-file changes, including creates, deletes, and moves; group related multi-file edits into one patch.",
+		"apply_patch can combine several file operations: Add File, Update File, Delete File, and Move to.",
+		"apply_patch input must include full patch envelope with *** Begin Patch and *** End Patch.",
+		"apply_patch input must include one or more file sections; each section starts with *** Add File:, *** Update File:, or *** Delete File:.",
+		"apply_patch requires new lines to be prefixed with + when adding a file or adding lines in an update hunk.",
+		"apply_patch file paths must be relative, never absolute."
 	],
 	parameters: ApplyPatchParams,
 	executionMode: "sequential",
