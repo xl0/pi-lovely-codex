@@ -1,29 +1,13 @@
 # @xl0/pi-lovely-codex
 
-Pi extension package for better experience with GPT models / Codex sub
+Pi extension for GPT service-tier controls and Codex-style `apply_patch` inside Pi.
 
-## Commands
+## What it adds
 
-### `/codex`
-
-Configure GPT mode for OpenAI GPT models:
-
-- `default` -> omits `service_tier`
-- `fast` -> sends `service_tier: "priority"` for OpenAI and Codex, accounts for Codex priority pricing
-- `fast-codex` -> sends priority only for Codex sub (`openai-codex`), omits `service_tier` for OpenAI API
-
-Non-default modes show `🏎️` in the status line.
-
-Settings are stored in User `~/.pi/agent/xl0-pi-lovely-codex.json` and Workspace `.pi/xl0-pi-lovely-codex.json`. Workspace overrides User. Omit `gptMode` (`unset` in UI) to inherit lower scope/default:
-
-```json
-{
-  "gptMode": "fast-codex"
-}
-```
-
-Run `/codex` for tabbed User/Workspace settings.
-
+- `/codex` interactive TUI config
+- GPT service-tier modes for OpenAI GPT models
+- Codex priority cost adjustment for `openai-codex`
+- `apply_patch` tool control: keep legacy tools, or make `apply_patch` replace `edit` + `write`
 
 ## Install
 
@@ -31,8 +15,54 @@ Run `/codex` for tabbed User/Workspace settings.
 pi install npm:@xl0/pi-lovely-codex
 ```
 
-Load without installing:
+Use without install:
 
 ```bash
 pi -e npm:@xl0/pi-lovely-codex
 ```
+
+## `/codex`
+
+Opens tabbed `User` and `Workspace` config.
+
+- `User` -> `~/.pi/agent/xl0-pi-lovely-codex.json`
+- `Workspace` -> `.pi/xl0-pi-lovely-codex.json`
+
+Workspace overrides User. `unset` removes setting from current scope and falls through to lower scope or default.
+
+### GPT mode
+
+- `default` -> omit `service_tier`
+- `fast` -> send `service_tier: "priority"` for `openai` and `openai-codex`
+- `fast-codex` -> send priority only for `openai-codex`
+
+Applies only to OpenAI GPT models: provider `openai` or `openai-codex`, model id starting with `gpt-`.
+
+Non-default effective mode shows `🏎️` in status line.
+
+### `apply_patch` mode
+
+- `disabled` -> remove `apply_patch`; restore `edit` + `write` only if active at session start
+- `enabled` -> enable `apply_patch`; restore `edit` + `write` only if active at session start
+- `replace-edit` -> enable `apply_patch`; remove active `edit` + `write`
+
+Default effective value: `enabled`.
+
+## Config file
+
+Example:
+
+```json
+{
+  "gptMode": "fast-codex",
+  "applyPatchMode": "replace-edit"
+}
+```
+
+Both keys optional.
+
+## Notes
+
+- Bad config on session load -> extension falls back to defaults and shows error.
+- Bad config in one `/codex` scope -> that scope ignored, warning shown.
+- Current `apply_patch` implementation shells out to `codex --codex-run-as-apply-patch`.

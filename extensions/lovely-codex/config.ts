@@ -8,18 +8,24 @@ export const CONFIG_FILE_NAME = "xl0-pi-lovely-codex.json"
 export const DEFAULT_GPT_MODE = "default" satisfies GptMode
 
 export const codexConfigSchema = Type.Object({
-	gptMode: Type.Optional(Type.Union([Type.Literal("default"), Type.Literal("fast"), Type.Literal("fast-codex")]))
+	gptMode: Type.Optional(Type.Union([Type.Literal("default"), Type.Literal("fast"), Type.Literal("fast-codex")])),
+	applyPatchMode: Type.Optional(Type.Union([Type.Literal("disabled"), Type.Literal("enabled"), Type.Literal("replace-edit")]))
 })
 
 const codexConfigValidator = Schema.Compile(codexConfigSchema)
 
 export type CodexConfig = Static<typeof codexConfigSchema>
 export type GptMode = NonNullable<CodexConfig["gptMode"]>
+export type ApplyPatchMode = NonNullable<CodexConfig["applyPatchMode"]>
 export type ConfigScope = "global" | "project"
 export type ScopedCodexConfig = Record<ConfigScope, CodexConfig>
 
 export function getGptMode(config: CodexConfig): GptMode {
 	return config.gptMode ?? DEFAULT_GPT_MODE
+}
+
+export function getApplyPatchMode(config: CodexConfig): ApplyPatchMode {
+	return config.applyPatchMode ?? "enabled"
 }
 
 export function getConfigPath(scope: ConfigScope, cwd: string): string {
