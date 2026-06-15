@@ -1,5 +1,8 @@
 import { spawn } from "node:child_process"
-import { defineTool, type ExtensionAPI } from "@earendil-works/pi-coding-agent"
+import { existsSync, readFileSync, statSync } from "node:fs"
+import { resolve } from "node:path"
+import { defineTool, type ExtensionAPI, generateDiffString, generateUnifiedPatch, renderDiff } from "@earendil-works/pi-coding-agent"
+import { Container, Spacer, Text } from "@earendil-works/pi-tui"
 import { Type } from "typebox"
 
 const ApplyPatchParams = Type.Object({
@@ -13,8 +16,88 @@ export interface ApplyPatchCommandResult {
 	output: string
 }
 
+export interface ApplyPatchToolDetails extends ApplyPatchCommandResult {
+	diff?: string
+	patch?: string
+	firstChangedLine?: number
+}
+
+interface FileSnapshot {
+	path: string
+	exists: boolean
+	content?: string
+}
+
 export function buildApplyPatchOutput(stdout: string, stderr: string): string {
 	return `${stdout}${stderr}`
+}
+
+function parseTouchedPaths(input: string): string[] {
+	const paths = new Set<string>()
+	let currentPath: string | undefined
+	for (const line of input.split("\n")) {
+		const fileMatch = line.match(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/)
+		if (fileMatch?.[1]) {
+			currentPath = fileMatch[1]
+			paths.add(currentPath)
+			continue
+		}
+
+		const moveMatch = line.match(/^\*\*\* Move to: (.+)$/)
+		if (moveMatch?.[1]) {
+			if (currentPath) paths.add(currentPath)
+			paths.add(moveMatch[1])
+			currentPath = moveMatch[1]
+		}
+	}
+	return Array.from(paths)
+}
+
+function readSnapshot(cwd: string, path: string): FileSnapshot {
+	const absolutePath = resolve(cwd, path)
+	if (!existsSync(absolutePath)) return { path, exists: false, content: "" }
+	try {
+		if (!statSync(absolutePath).isFile()) return { path, exists: true }
+		return { path, exists: true, content: readFileSync(absolutePath, "utf-8") }
+	} catch {
+		return { path, exists: true }
+	}
+}
+
+function buildDiff(before: FileSnapshot[], after: FileSnapshot[]): Pick<ApplyPatchToolDetails, "diff" | "patch" | "firstChangedLine"> {
+	const changedDiffs: { path: string; diff: string }[] = []
+	let firstChangedLine: number | undefined
+
+	for (const oldFile of before) {
+		const newFile = after.find(file => file.path === oldFile.path)
+		if (!newFile || (oldFile.exists === newFile.exists && oldFile.content === newFile.content)) continue
+		if (oldFile.content === undefined || newFile.content === undefined) continue
+
+		const diff = generateDiffString(oldFile.content, newFile.content)
+		if (diff.diff) {
+			changedDiffs.push({ path: oldFile.path, diff: diff.diff })
+			firstChangedLine ??= diff.firstChangedLine
+		}
+	}
+
+	const onlyChangedFile = changedDiffs[0]
+	const diffParts =
+		changedDiffs.length === 1 && onlyChangedFile ? [onlyChangedFile.diff] : changedDiffs.flatMap(file => [file.path, file.diff])
+
+	const result: Pick<ApplyPatchToolDetails, "diff" | "patch" | "firstChangedLine"> = {
+		diff: diffParts.join("\n"),
+		patch: changedDiffs
+			.map(file => {
+				const oldFile = before.find(snapshot => snapshot.path === file.path)
+				const newFile = after.find(snapshot => snapshot.path === file.path)
+				if (oldFile?.content === undefined || newFile?.content === undefined) return ""
+				return generateUnifiedPatch(file.path, oldFile.content, newFile.content)
+			})
+			.filter(Boolean)
+			.join("\n")
+	}
+	if (firstChangedLine !== undefined) result.firstChangedLine = firstChangedLine
+	return result
 }
 
 export async function runCodexApplyPatch(cwd: string, input: string): Promise<ApplyPatchCommandResult> {
@@ -56,19 +139,43 @@ const applyPatchTool = defineTool({
 	],
 	parameters: ApplyPatchParams,
 	executionMode: "sequential",
+	renderCall(args, theme) {
+		const paths = parseTouchedPaths(args.input ?? "").join(", ")
+		const suffix = paths ? ` ${theme.fg("accent", paths)}` : ""
+		return new Text(`${theme.fg("toolTitle", theme.bold("apply_patch"))}${suffix}`, 0, 0)
+	},
 	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+		const touchedPaths = parseTouchedPaths(params.input)
+		const before = touchedPaths.map(path => readSnapshot(ctx.cwd, path))
 		const result = await runCodexApplyPatch(ctx.cwd, params.input)
+		const after = touchedPaths.map(path => readSnapshot(ctx.cwd, path))
+		const diffDetails = buildDiff(before, after)
 		if (result.exitCode !== 0) {
-			throw new Error(result.output || `apply_patch failed with exit code ${result.exitCode}`)
+			const diffOutput = diffDetails.diff ? `\n\nPartial changes:\n${diffDetails.diff}` : ""
+			throw new Error((result.output || `apply_patch failed with exit code ${result.exitCode}`) + diffOutput)
 		}
 		return {
 			content: [{ type: "text", text: result.output }],
 			details: {
 				exitCode: result.exitCode,
 				stdout: result.stdout,
-				stderr: result.stderr
+				stderr: result.stderr,
+				output: result.output,
+				...diffDetails
 			}
 		}
+	},
+	renderResult(result, _options, _theme, context) {
+		const component = new Container()
+		component.clear()
+		if (context.isError) return component
+
+		const details = result.details as ApplyPatchToolDetails | undefined
+		if (!details?.diff) return component
+
+		component.addChild(new Spacer(1))
+		component.addChild(new Text(renderDiff(details.diff), 1, 0))
+		return component
 	}
 })
 
