@@ -54,7 +54,7 @@ When `apply_patch` is enabled, indented sub-options can disable built-in file-wr
 - `disable write` -> remove active `write`
 - `disable edit` -> remove active `edit`
 
-Default effective values: `add apply_patch = on`, `disable write = off`, `disable edit = off`.
+Default effective values: `add apply_patch = gpt-only`, `disable write = off`, `disable edit = off`.
 
 ## Config file
 

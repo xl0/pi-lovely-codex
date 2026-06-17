@@ -1,17 +1,17 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
 import { registerApplyPatchTool } from "./apply-patch.js"
-import { registerCodexCommand } from "./command.js"
 import {
+	CONFIG_FILE_NAME,
 	type CodexConfig,
+	codexConfigFields,
 	getApplyPatchAddMode,
 	getDisableEdit,
 	getDisableWrite,
 	getGptMode,
-	loadScopedConfig,
-	mergeConfig,
-	type ScopedCodexConfig
+	loadConfig
 } from "./config.js"
 import { registerGptModeHooks } from "./gpt-mode.js"
+import { createScopedConfigCommand } from "./scoped-config-command.js"
 
 function isGptModel(model: ExtensionContext["model"]): boolean {
 	return model?.id.startsWith("gpt-") || model?.id.includes("/gpt-") || false
@@ -43,10 +43,10 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 		ctx.ui.setStatus("lovely-codex", mode === "default" ? undefined : ctx.ui.theme.fg("accent", "🏎️"))
 	}
 	const refreshConfig = (cwd: string) => {
-		config = mergeConfig(loadScopedConfig(cwd))
+		config = loadConfig(cwd)
 	}
-	const setConfigByScope = (nextConfigByScope: ScopedCodexConfig, ctx: ExtensionContext) => {
-		config = mergeConfig(nextConfigByScope)
+	const setConfig = (nextConfig: CodexConfig, ctx: ExtensionContext) => {
+		config = nextConfig
 		applyToolConfig()
 		updateStatus(ctx)
 	}
@@ -71,7 +71,16 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 		applyToolConfig()
 	})
 
-	registerCodexCommand(pi, setConfigByScope)
+	createScopedConfigCommand<CodexConfig>({
+		command: "codex",
+		description: "Configure Lovely Codex settings",
+		title: "Lovely Codex",
+		fileName: CONFIG_FILE_NAME,
+		fields: codexConfigFields,
+		onChange(effective, _scoped, ctx) {
+			setConfig(effective, ctx)
+		}
+	})(pi)
 	registerGptModeHooks(pi, getMode)
 	registerApplyPatchTool(pi)
 }
