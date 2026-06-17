@@ -26,7 +26,7 @@ State below describes current codebase, not history.
 
 ## Config model
 
-Implemented in `extensions/lovely-codex/config.ts`.
+Implemented in `extensions/lovely-codex/config.ts`, driven by field descriptors in `codexConfigFields`.
 
 Config schema:
 
@@ -44,13 +44,13 @@ All fields are optional. Omitted means unset in that scope.
 Defaults after scope merge:
 
 - `gptMode`: `default`
-- `applyPatchAddMode`: `on`
+- `applyPatchAddMode`: `gpt-only`
 - `disableWrite`: `false`
 - `disableEdit`: `false`
 
 Scopes:
 
-- global: `~/.pi/agent/xl0-pi-lovely-codex.json`
+- global: `${getAgentDir()}/xl0-pi-lovely-codex.json` (default `~/.pi/agent/...`)
 - project: `<cwd>/.pi/xl0-pi-lovely-codex.json`
 
 Project overrides global through shallow merge:
@@ -59,8 +59,8 @@ Project overrides global through shallow merge:
 { ...global, ...project }
 ```
 
-Config IO is sync and TypeBox-validated. Missing files load as `{}`.
-Invalid JSON/schema throws a config error with file path.
+Config IO is sync and TypeBox-validated through the internal scoped-config helper.
+Missing files load as `{}`. Invalid JSON/schema throws a config error with file path.
 Resetting a scope deletes its config file; missing file is OK.
 
 ## Extension lifecycle
@@ -113,9 +113,28 @@ Status indicator:
 
 Baseline prevents extension from enabling tools that were not active before it ran.
 
+## Scoped config helper
+
+Implemented in `extensions/lovely-codex/scoped-config-command.ts`.
+
+Internal helper exports:
+
+- `createScopedConfigSchema(fields)`: derives flat TypeBox schema from field descriptors
+- `createScopedConfigIO({ fileName, title, schema })`: sync scoped config paths, load, write, delete, shallow merge
+- `createScopedConfigCommand(options)`: registers a TUI User/Workspace config editor
+
+Supported field kinds: `enum`, `boolean`.
+Persisted keys are flat; `children` only controls UI nesting.
+Defaults live on fields and are used for UI notes/visibility, not persisted.
+`visibleWhen` reads default-filled effective config through `get()` and can read scoped values through `getScoped()`.
+Hidden fields stay persisted/effective.
+Writes are immediate per field cycle; unset deletes only that key.
+Reset deletes the active scope file.
+Caller owns runtime side effects through `onChange(effective, scoped, ctx)`.
+
 ## `/codex` command
 
-Implemented in `extensions/lovely-codex/command.ts`.
+Registered in `extensions/lovely-codex/index.ts` using the scoped config helper.
 
 Command takes no args and opens a TUI config editor.
 
@@ -136,8 +155,8 @@ UI:
 
 Save behavior:
 
-- writes only active scope
-- updates command-local scoped config and extension effective config
+- writes only active scope immediately
+- updates command-local scoped config and extension effective config through helper `onChange`
 - reapplies tool activation
 - updates status indicator
 - reset clears active scope in memory, deletes its file, then reapplies state
