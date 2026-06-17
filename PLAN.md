@@ -9,7 +9,7 @@
 - Apply service-tier payload only to OpenAI GPT models (`provider` `openai`/`openai-codex`, id starts `gpt-`) to avoid breaking other OpenAI-compatible providers.
 - Adjust priority pricing on finalized `openai-codex` assistant messages; normal OpenAI provider responses keep native provider pricing behavior.
 - `docs/APPLY_PATCH_REPORT.md` captures source review of existing Pi-native `apply_patch`; use as reference when replacing current wrapper.
-- `applyPatchMode` controls file-editing tool exposure: `disabled` removes `apply_patch`; `enabled` enables `apply_patch`; both non-replace modes restore `edit`/`write` only if active at session start; `replace-edit` enables `apply_patch` and removes active `edit`/`write`. Config is scoped like `gptMode`; default is `enabled`.
+- File-editing tool exposure is split: `applyPatchAddMode` (`on`/`off`/`gpt-only`, default `on`) controls adding `apply_patch`; `disableWrite`/`disableEdit` booleans (default `false`) remove baseline `write`/`edit` only while `apply_patch` is active. Config is scoped like `gptMode`.
 
 ## Todo
 - [x] Add package manifest and Pi extension entry.
