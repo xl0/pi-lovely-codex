@@ -6,6 +6,7 @@ import {
 	type CodexConfig,
 	type ConfigScope,
 	DEFAULT_GPT_MODE,
+	deleteConfigFile,
 	type GptMode,
 	getApplyPatchMode,
 	getConfigPath,
@@ -117,7 +118,7 @@ export function registerCodexCommand(pi: ExtensionAPI, setConfigByScope: (config
 			await ctx.ui.custom<void>((tui, theme, _keybindings, done) => {
 				let currentTab = 0
 				let currentSetting = 0
-				const settingCount = 2
+				const settingCount = 3
 
 				function currentScope(): ConfigScope {
 					return scopeTabs[currentTab]?.scope ?? "global"
@@ -135,6 +136,13 @@ export function registerCodexCommand(pi: ExtensionAPI, setConfigByScope: (config
 				function save(scope: ConfigScope, config: CodexConfig) {
 					configs = { ...configs, [scope]: config }
 					writeConfigFile(getConfigPath(scope, ctx.cwd), config)
+					setConfigByScope(configs, ctx)
+					refresh()
+				}
+
+				function reset(scope: ConfigScope) {
+					configs = { ...configs, [scope]: {} }
+					deleteConfigFile(getConfigPath(scope, ctx.cwd))
 					setConfigByScope(configs, ctx)
 					refresh()
 				}
@@ -165,7 +173,11 @@ export function registerCodexCommand(pi: ExtensionAPI, setConfigByScope: (config
 							save(scope, withGptMode(activeConfig, nextOption(gptModeOptions, getScopedGptMode(activeConfig))))
 							return
 						}
-						save(scope, withApplyPatchMode(activeConfig, nextOption(applyPatchModeOptions, getScopedApplyPatchMode(activeConfig))))
+						if (currentSetting === 1) {
+							save(scope, withApplyPatchMode(activeConfig, nextOption(applyPatchModeOptions, getScopedApplyPatchMode(activeConfig))))
+							return
+						}
+						reset(scope)
 						return
 					}
 					if (matchesKey(data, Key.escape)) done(undefined)
@@ -227,8 +239,14 @@ export function registerCodexCommand(pi: ExtensionAPI, setConfigByScope: (config
 					const patchNote = applyPatchNote ? ` ${theme.fg("muted", `(${applyPatchNote})`)}` : ""
 					addWrappedWithPrefix(patchPrefix, `${theme.fg("text", "apply_patch")}  ${patchValue}${patchNote}`)
 
+					const resetPrefix = theme.fg(currentSetting === 2 ? "accent" : "muted", currentSetting === 2 ? "> " : "  ")
+					addWrappedWithPrefix(
+						resetPrefix,
+						`${theme.fg("text", "Reset to default")}  ${theme.fg("muted", "delete this scope config file")}`
+					)
+
 					lines.push("")
-					addWrappedWithPrefix(" ", theme.fg("dim", "Tab/←→ switch scope • ↑↓ select • Enter/Space change • Esc close"))
+					addWrappedWithPrefix(" ", theme.fg("dim", "Tab/←→ switch scope • ↑↓ select • Enter/Space change/reset • Esc close"))
 					lines.push(theme.fg("accent", "─".repeat(renderWidth)))
 
 					return lines
