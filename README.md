@@ -29,6 +29,7 @@ Opens tabbed `User` and `Workspace` config.
 - `Workspace` -> `.pi/xl0-pi-lovely-codex.json`
 
 Workspace overrides User. `unset` removes setting from current scope and falls through to lower scope or default.
+`Reset to default` deletes current scope config file and refreshes local state.
 
 ### GPT mode
 

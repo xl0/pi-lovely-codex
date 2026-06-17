@@ -57,6 +57,7 @@ Project overrides global through shallow merge:
 
 Config IO is sync and TypeBox-validated. Missing files load as `{}`.
 Invalid JSON/schema throws a config error with file path.
+Resetting a scope deletes its config file; missing file is OK.
 
 ## Extension lifecycle
 
@@ -120,6 +121,7 @@ UI:
 - rows:
   - `GPT mode`: `unset`, `default`, `fast`, `fast-codex`
   - `apply_patch`: `unset`, `disabled`, `enabled`, `replace-edit`
+  - `Reset to default`: deletes active scope config file
 - notes explain effective value:
   - workspace override
   - user inheritance
@@ -131,6 +133,7 @@ Save behavior:
 - refreshes in-memory scoped config
 - reapplies tool activation
 - updates status indicator
+- reset clears active scope in memory, deletes its file, then reapplies state
 
 If one scoped config is invalid, command warns and opens that scope empty;
 other scope still loads.

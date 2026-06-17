@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { type Static, Type } from "typebox"
@@ -60,4 +60,8 @@ export function readConfigFile(path: string): CodexConfig {
 export function writeConfigFile(path: string, config: CodexConfig): void {
 	mkdirSync(resolve(path, ".."), { recursive: true })
 	writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`, "utf-8")
+}
+
+export function deleteConfigFile(path: string): void {
+	rmSync(path, { force: true })
 }
