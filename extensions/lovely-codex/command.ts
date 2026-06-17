@@ -220,27 +220,26 @@ export function registerCodexCommand(pi: ExtensionAPI, setConfigByScope: (config
 						const scope = currentScope()
 						const activeConfig = configs[scope]
 						const row = settingRows(scope)[currentSetting]
-						if (row === "gpt") {
-							save(scope, withGptMode(activeConfig, nextOption(gptModeOptions, getScopedGptMode(activeConfig))))
-							return
+						switch (row) {
+							case "gpt":
+								save(scope, withGptMode(activeConfig, nextOption(gptModeOptions, getScopedGptMode(activeConfig))))
+								return
+							case "applyPatchAdd":
+								save(
+									scope,
+									withApplyPatchAddMode(activeConfig, nextOption(applyPatchAddModeOptions, getScopedApplyPatchAddMode(activeConfig)))
+								)
+								return
+							case "disableWrite":
+								save(scope, withDisableWrite(activeConfig, nextOption(disableToolOptions, getScopedDisableWrite(activeConfig))))
+								return
+							case "disableEdit":
+								save(scope, withDisableEdit(activeConfig, nextOption(disableToolOptions, getScopedDisableEdit(activeConfig))))
+								return
+							case "reset":
+								reset(scope)
+								return
 						}
-						if (row === "applyPatchAdd") {
-							save(
-								scope,
-								withApplyPatchAddMode(activeConfig, nextOption(applyPatchAddModeOptions, getScopedApplyPatchAddMode(activeConfig)))
-							)
-							return
-						}
-						if (row === "disableWrite") {
-							save(scope, withDisableWrite(activeConfig, nextOption(disableToolOptions, getScopedDisableWrite(activeConfig))))
-							return
-						}
-						if (row === "disableEdit") {
-							save(scope, withDisableEdit(activeConfig, nextOption(disableToolOptions, getScopedDisableEdit(activeConfig))))
-							return
-						}
-						reset(scope)
-						return
 					}
 					if (matchesKey(data, Key.escape)) done(undefined)
 				}
