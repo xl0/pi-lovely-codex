@@ -6,7 +6,7 @@ Pi package adding Codex-oriented controls to the coding agent:
 
 - choose GPT service-tier behavior per user/workspace
 - expose Codex-compatible `apply_patch`
-- optionally replace built-in `edit`/`write` tools with `apply_patch`
+- control file-editing tools per user/workspace
 
 State below describes current codebase, not history.
 
@@ -33,16 +33,20 @@ Config schema:
 ```json
 {
   "gptMode": "default | fast | fast-codex",
-  "applyPatchMode": "disabled | enabled | replace-edit"
+  "applyPatchAddMode": "on | off | gpt-only",
+  "disableWrite": "boolean",
+  "disableEdit": "boolean"
 }
 ```
 
-Both fields are optional. Omitted means unset in that scope.
+All fields are optional. Omitted means unset in that scope.
 
 Defaults after scope merge:
 
 - `gptMode`: `default`
-- `applyPatchMode`: `enabled`
+- `applyPatchAddMode`: `on`
+- `disableWrite`: `false`
+- `disableEdit`: `false`
 
 Scopes:
 
@@ -65,14 +69,15 @@ Implemented in `extensions/lovely-codex/index.ts`.
 
 Entrypoint `lovelyCodexExtension(pi)` owns process-local state:
 
-- `configByScope`: current global/project config objects
+- `config`: effective merged config
 - `editToolBaseline`: active tool set captured at session start
+- `selectedModelIsGpt`: current model GPT-ness for `gpt-only` apply-patch mode
 
 On `session_start`:
 
 1. capture active tools as baseline
-2. load both config scopes for current `cwd`
-3. apply `applyPatchMode` to active tools
+2. load and merge both config scopes for current `cwd`
+3. apply tool config to active tools
 4. update `lovely-codex` status indicator
 
 If config loading fails:
@@ -95,17 +100,16 @@ Status indicator:
 
 ## Tool activation semantics
 
-`applyToolConfig()` mutates Pi active tools from effective `applyPatchMode`.
+`applyToolConfig()` mutates Pi active tools from maintained effective config and selected model state.
 
-- `disabled`
-  - remove `apply_patch`
-  - restore `write`/`edit` only if present in session-start baseline
-- `enabled`
-  - add `apply_patch`
-  - restore baseline `write`/`edit`
-- `replace-edit`
-  - add `apply_patch`
-  - remove `write` and `edit`
+- `applyPatchAddMode=on`: add `apply_patch`
+- `applyPatchAddMode=off`: remove `apply_patch`
+- `applyPatchAddMode=gpt-only`: add `apply_patch` only when current model id
+  starts with `gpt-` or contains `/gpt-`; model changes reapply tool config
+- `disableWrite=true`: remove `write` while `apply_patch` is active;
+  otherwise restore it only if present in session-start baseline
+- `disableEdit=true`: remove `edit` while `apply_patch` is active;
+  otherwise restore it only if present in session-start baseline
 
 Baseline prevents extension from enabling tools that were not active before it ran.
 
@@ -120,7 +124,10 @@ UI:
 - tabbed scopes: `User` = global, `Workspace` = project
 - rows:
   - `GPT mode`: `unset`, `default`, `fast`, `fast-codex`
-  - `apply_patch`: `unset`, `disabled`, `enabled`, `replace-edit`
+  - `add apply_patch`: `unset`, `on`, `off`, `gpt-only`
+  - indented sub-options when `apply_patch` is effectively not `off`:
+    - `disable write`: `unset`, `on`, `off`
+    - `disable edit`: `unset`, `on`, `off`
   - `Reset to default`: separated destructive action; deletes active scope config file
 - notes explain effective value:
   - workspace override
@@ -130,7 +137,7 @@ UI:
 Save behavior:
 
 - writes only active scope
-- refreshes in-memory scoped config
+- updates command-local scoped config and extension effective config
 - reapplies tool activation
 - updates status indicator
 - reset clears active scope in memory, deletes its file, then reapplies state

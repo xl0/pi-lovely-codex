@@ -6,17 +6,22 @@ import Schema from "typebox/schema"
 
 export const CONFIG_FILE_NAME = "xl0-pi-lovely-codex.json"
 export const DEFAULT_GPT_MODE = "default" satisfies GptMode
+export const DEFAULT_APPLY_PATCH_ADD_MODE = "on" satisfies ApplyPatchAddMode
+export const DEFAULT_DISABLE_WRITE = false
+export const DEFAULT_DISABLE_EDIT = false
 
 export const codexConfigSchema = Type.Object({
 	gptMode: Type.Optional(Type.Union([Type.Literal("default"), Type.Literal("fast"), Type.Literal("fast-codex")])),
-	applyPatchMode: Type.Optional(Type.Union([Type.Literal("disabled"), Type.Literal("enabled"), Type.Literal("replace-edit")]))
+	applyPatchAddMode: Type.Optional(Type.Union([Type.Literal("off"), Type.Literal("on"), Type.Literal("gpt-only")])),
+	disableWrite: Type.Optional(Type.Boolean()),
+	disableEdit: Type.Optional(Type.Boolean())
 })
 
 const codexConfigValidator = Schema.Compile(codexConfigSchema)
 
 export type CodexConfig = Static<typeof codexConfigSchema>
 export type GptMode = NonNullable<CodexConfig["gptMode"]>
-export type ApplyPatchMode = NonNullable<CodexConfig["applyPatchMode"]>
+export type ApplyPatchAddMode = NonNullable<CodexConfig["applyPatchAddMode"]>
 export type ConfigScope = "global" | "project"
 export type ScopedCodexConfig = Record<ConfigScope, CodexConfig>
 
@@ -24,8 +29,16 @@ export function getGptMode(config: CodexConfig): GptMode {
 	return config.gptMode ?? DEFAULT_GPT_MODE
 }
 
-export function getApplyPatchMode(config: CodexConfig): ApplyPatchMode {
-	return config.applyPatchMode ?? "enabled"
+export function getApplyPatchAddMode(config: CodexConfig): ApplyPatchAddMode {
+	return config.applyPatchAddMode ?? DEFAULT_APPLY_PATCH_ADD_MODE
+}
+
+export function getDisableWrite(config: CodexConfig): boolean {
+	return config.disableWrite ?? DEFAULT_DISABLE_WRITE
+}
+
+export function getDisableEdit(config: CodexConfig): boolean {
+	return config.disableEdit ?? DEFAULT_DISABLE_EDIT
 }
 
 export function getConfigPath(scope: ConfigScope, cwd: string): string {

@@ -7,7 +7,7 @@ Pi extension for GPT service-tier controls and Codex-style `apply_patch` inside 
 - `/codex` interactive TUI config
 - GPT service-tier modes for OpenAI GPT models
 - Codex priority cost adjustment for `openai-codex`
-- `apply_patch` tool control: keep legacy tools, or make `apply_patch` replace `edit` + `write`
+- file-editing tool control: add `apply_patch`, optionally disable `edit` + `write`
 
 ## Install
 
@@ -41,13 +41,20 @@ Applies only to OpenAI GPT models: provider `openai` or `openai-codex`, model id
 
 Non-default effective mode shows `🏎️` in status line.
 
-### `apply_patch` mode
+### Tool modes
 
-- `disabled` -> remove `apply_patch`; restore `edit` + `write` only if active at session start
-- `enabled` -> enable `apply_patch`; restore `edit` + `write` only if active at session start
-- `replace-edit` -> enable `apply_patch`; remove active `edit` + `write`
+`add apply_patch` controls whether Lovely Codex enables the `apply_patch` tool:
 
-Default effective value: `enabled`.
+- `on` -> enable `apply_patch`
+- `off` -> remove `apply_patch`
+- `gpt-only` -> enable `apply_patch` only when current model id has a `gpt-` segment
+
+When `apply_patch` is enabled, indented sub-options can disable built-in file-writing tools:
+
+- `disable write` -> remove active `write`
+- `disable edit` -> remove active `edit`
+
+Default effective values: `add apply_patch = on`, `disable write = off`, `disable edit = off`.
 
 ## Config file
 
@@ -56,11 +63,13 @@ Example:
 ```json
 {
   "gptMode": "fast-codex",
-  "applyPatchMode": "replace-edit"
+  "applyPatchAddMode": "gpt-only",
+  "disableWrite": true,
+  "disableEdit": true
 }
 ```
 
-Both keys optional.
+All keys optional.
 
 ## Notes
 

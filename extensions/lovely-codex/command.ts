@@ -1,14 +1,17 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
 import { Key, matchesKey, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui"
 import {
-	type ApplyPatchMode,
+	type ApplyPatchAddMode,
 	CONFIG_FILE_NAME,
 	type CodexConfig,
 	type ConfigScope,
+	DEFAULT_APPLY_PATCH_ADD_MODE,
+	DEFAULT_DISABLE_EDIT,
+	DEFAULT_DISABLE_WRITE,
 	DEFAULT_GPT_MODE,
 	deleteConfigFile,
 	type GptMode,
-	getApplyPatchMode,
+	getApplyPatchAddMode,
 	getConfigPath,
 	readConfigFile,
 	type ScopedCodexConfig,
@@ -16,7 +19,9 @@ import {
 } from "./config.js"
 
 type GptModeSetting = GptMode | "unset"
-type ApplyPatchModeSetting = ApplyPatchMode | "unset"
+type ApplyPatchAddModeSetting = ApplyPatchAddMode | "unset"
+type DisableToolSetting = "unset" | "on" | "off"
+type SettingRow = "gpt" | "applyPatchAdd" | "disableWrite" | "disableEdit" | "reset"
 
 const scopeTabs: Array<{ scope: ConfigScope; label: string; path: string }> = [
 	{ scope: "global", label: "User", path: `~/.pi/agent/${CONFIG_FILE_NAME}` },
@@ -24,14 +29,23 @@ const scopeTabs: Array<{ scope: ConfigScope; label: string; path: string }> = [
 ]
 
 const gptModeOptions: GptModeSetting[] = ["unset", "default", "fast", "fast-codex"]
-const applyPatchModeOptions: ApplyPatchModeSetting[] = ["unset", "disabled", "enabled", "replace-edit"]
+const applyPatchAddModeOptions: ApplyPatchAddModeSetting[] = ["unset", "on", "off", "gpt-only"]
+const disableToolOptions: DisableToolSetting[] = ["unset", "on", "off"]
 
 function getScopedGptMode(config: CodexConfig): GptModeSetting {
 	return config.gptMode ?? "unset"
 }
 
-function getScopedApplyPatchMode(config: CodexConfig): ApplyPatchModeSetting {
-	return config.applyPatchMode ?? "unset"
+function getScopedApplyPatchAddMode(config: CodexConfig): ApplyPatchAddModeSetting {
+	return config.applyPatchAddMode ?? "unset"
+}
+
+function getScopedDisableWrite(config: CodexConfig): DisableToolSetting {
+	return config.disableWrite === undefined ? "unset" : config.disableWrite ? "on" : "off"
+}
+
+function getScopedDisableEdit(config: CodexConfig): DisableToolSetting {
+	return config.disableEdit === undefined ? "unset" : config.disableEdit ? "on" : "off"
 }
 
 function withGptMode(config: CodexConfig, mode: GptModeSetting): CodexConfig {
@@ -41,10 +55,24 @@ function withGptMode(config: CodexConfig, mode: GptModeSetting): CodexConfig {
 	return next
 }
 
-function withApplyPatchMode(config: CodexConfig, mode: ApplyPatchModeSetting): CodexConfig {
+function withApplyPatchAddMode(config: CodexConfig, mode: ApplyPatchAddModeSetting): CodexConfig {
 	const next = { ...config }
-	if (mode === "unset") delete next.applyPatchMode
-	else next.applyPatchMode = mode
+	if (mode === "unset") delete next.applyPatchAddMode
+	else next.applyPatchAddMode = mode
+	return next
+}
+
+function withDisableWrite(config: CodexConfig, mode: DisableToolSetting): CodexConfig {
+	const next = { ...config }
+	if (mode === "unset") delete next.disableWrite
+	else next.disableWrite = mode === "on"
+	return next
+}
+
+function withDisableEdit(config: CodexConfig, mode: DisableToolSetting): CodexConfig {
+	const next = { ...config }
+	if (mode === "unset") delete next.disableEdit
+	else next.disableEdit = mode === "on"
 	return next
 }
 
@@ -53,27 +81,7 @@ function nextOption<T extends string>(options: T[], value: T): T {
 	return options[(index + 1) % options.length] ?? options[0] ?? value
 }
 
-function getScopeNote(scope: ConfigScope, configs: ScopedCodexConfig): string | undefined {
-	const userMode = configs.global.gptMode
-	const workspaceMode = configs.project.gptMode
-	if (!userMode && !workspaceMode) return `uses default: ${DEFAULT_GPT_MODE}`
-
-	if (scope === "global") {
-		if (userMode && workspaceMode) return `Workspace overrides with: ${workspaceMode}`
-		if (!userMode && workspaceMode) return `Workspace sets: ${workspaceMode}`
-		return undefined
-	}
-
-	if (!workspaceMode && userMode) return `inherits User: ${userMode}`
-	if (workspaceMode && userMode) return workspaceMode === userMode ? `same as User: ${userMode}` : `overrides User: ${userMode}`
-	if (workspaceMode && !userMode) return `overrides default: ${DEFAULT_GPT_MODE}`
-	return undefined
-}
-
-function getApplyPatchScopeNote(scope: ConfigScope, configs: ScopedCodexConfig): string | undefined {
-	const userMode = configs.global.applyPatchMode
-	const workspaceMode = configs.project.applyPatchMode
-	const defaultMode = getApplyPatchMode({})
+function getModeScopeNote<T extends string>(scope: ConfigScope, userMode: T | undefined, workspaceMode: T | undefined, defaultMode: T) {
 	if (!userMode && !workspaceMode) return `uses default: ${defaultMode}`
 
 	if (scope === "global") {
@@ -86,6 +94,36 @@ function getApplyPatchScopeNote(scope: ConfigScope, configs: ScopedCodexConfig):
 	if (workspaceMode && userMode) return workspaceMode === userMode ? `same as User: ${userMode}` : `overrides User: ${userMode}`
 	if (workspaceMode && !userMode) return `overrides default: ${defaultMode}`
 	return undefined
+}
+
+function getScopeNote(scope: ConfigScope, configs: ScopedCodexConfig): string | undefined {
+	return getModeScopeNote(scope, configs.global.gptMode, configs.project.gptMode, DEFAULT_GPT_MODE)
+}
+
+function getApplyPatchAddScopeNote(scope: ConfigScope, configs: ScopedCodexConfig): string | undefined {
+	return getModeScopeNote(scope, configs.global.applyPatchAddMode, configs.project.applyPatchAddMode, DEFAULT_APPLY_PATCH_ADD_MODE)
+}
+
+function getBooleanMode(value: boolean | undefined): "on" | "off" | undefined {
+	return value === undefined ? undefined : value ? "on" : "off"
+}
+
+function getDisableWriteScopeNote(scope: ConfigScope, configs: ScopedCodexConfig): string | undefined {
+	return getModeScopeNote(
+		scope,
+		getBooleanMode(configs.global.disableWrite),
+		getBooleanMode(configs.project.disableWrite),
+		DEFAULT_DISABLE_WRITE ? "on" : "off"
+	)
+}
+
+function getDisableEditScopeNote(scope: ConfigScope, configs: ScopedCodexConfig): string | undefined {
+	return getModeScopeNote(
+		scope,
+		getBooleanMode(configs.global.disableEdit),
+		getBooleanMode(configs.project.disableEdit),
+		DEFAULT_DISABLE_EDIT ? "on" : "off"
+	)
 }
 
 function loadCommandConfig(ctx: ExtensionContext): ScopedCodexConfig {
@@ -118,13 +156,24 @@ export function registerCodexCommand(pi: ExtensionAPI, setConfigByScope: (config
 			await ctx.ui.custom<void>((tui, theme, _keybindings, done) => {
 				let currentTab = 0
 				let currentSetting = 0
-				const settingCount = 3
 
 				function currentScope(): ConfigScope {
 					return scopeTabs[currentTab]?.scope ?? "global"
 				}
 
+				function effectiveConfig(scope: ConfigScope): CodexConfig {
+					return scope === "global" ? configs.global : { ...configs.global, ...configs.project }
+				}
+
+				function settingRows(scope: ConfigScope = currentScope()): SettingRow[] {
+					const rows: SettingRow[] = ["gpt", "applyPatchAdd"]
+					if (getApplyPatchAddMode(effectiveConfig(scope)) !== "off") rows.push("disableWrite", "disableEdit")
+					rows.push("reset")
+					return rows
+				}
+
 				function refresh() {
+					currentSetting = Math.min(currentSetting, settingRows().length - 1)
 					tui.requestRender()
 				}
 
@@ -157,24 +206,37 @@ export function registerCodexCommand(pi: ExtensionAPI, setConfigByScope: (config
 						return
 					}
 					if (matchesKey(data, Key.down)) {
-						currentSetting = (currentSetting + 1) % settingCount
+						currentSetting = (currentSetting + 1) % settingRows().length
 						refresh()
 						return
 					}
 					if (matchesKey(data, Key.up)) {
-						currentSetting = (currentSetting + settingCount - 1) % settingCount
+						const rows = settingRows()
+						currentSetting = (currentSetting + rows.length - 1) % rows.length
 						refresh()
 						return
 					}
 					if (matchesKey(data, Key.enter) || data === " ") {
 						const scope = currentScope()
 						const activeConfig = configs[scope]
-						if (currentSetting === 0) {
+						const row = settingRows(scope)[currentSetting]
+						if (row === "gpt") {
 							save(scope, withGptMode(activeConfig, nextOption(gptModeOptions, getScopedGptMode(activeConfig))))
 							return
 						}
-						if (currentSetting === 1) {
-							save(scope, withApplyPatchMode(activeConfig, nextOption(applyPatchModeOptions, getScopedApplyPatchMode(activeConfig))))
+						if (row === "applyPatchAdd") {
+							save(
+								scope,
+								withApplyPatchAddMode(activeConfig, nextOption(applyPatchAddModeOptions, getScopedApplyPatchAddMode(activeConfig)))
+							)
+							return
+						}
+						if (row === "disableWrite") {
+							save(scope, withDisableWrite(activeConfig, nextOption(disableToolOptions, getScopedDisableWrite(activeConfig))))
+							return
+						}
+						if (row === "disableEdit") {
+							save(scope, withDisableEdit(activeConfig, nextOption(disableToolOptions, getScopedDisableEdit(activeConfig))))
 							return
 						}
 						reset(scope)
@@ -190,8 +252,14 @@ export function registerCodexCommand(pi: ExtensionAPI, setConfigByScope: (config
 					const activeConfig = configs[scope]
 					const rawMode = getScopedGptMode(activeConfig)
 					const note = getScopeNote(scope, configs)
-					const applyPatchMode = getScopedApplyPatchMode(activeConfig)
-					const applyPatchNote = getApplyPatchScopeNote(scope, configs)
+					const applyPatchAddMode = getScopedApplyPatchAddMode(activeConfig)
+					const applyPatchAddNote = getApplyPatchAddScopeNote(scope, configs)
+					const disableWriteMode = getScopedDisableWrite(activeConfig)
+					const disableWriteNote = getDisableWriteScopeNote(scope, configs)
+					const disableEditMode = getScopedDisableEdit(activeConfig)
+					const disableEditNote = getDisableEditScopeNote(scope, configs)
+					const rows = settingRows(scope)
+					const selected = (row: SettingRow) => rows[currentSetting] === row
 					function addWrapped(text: string) {
 						lines.push(...wrapTextWithAnsi(text, renderWidth))
 					}
@@ -214,7 +282,11 @@ export function registerCodexCommand(pi: ExtensionAPI, setConfigByScope: (config
 					const tabs: string[] = ["← "]
 					for (const [index, tab] of scopeTabs.entries()) {
 						const scopeConfig = configs[tab.scope]
-						const isUnset = getScopedGptMode(scopeConfig) === "unset" && getScopedApplyPatchMode(scopeConfig) === "unset"
+						const isUnset =
+							getScopedGptMode(scopeConfig) === "unset" &&
+							getScopedApplyPatchAddMode(scopeConfig) === "unset" &&
+							getScopedDisableWrite(scopeConfig) === "unset" &&
+							getScopedDisableEdit(scopeConfig) === "unset"
 						const marker = isUnset ? "□" : "■"
 						const text = ` ${marker} ${tab.label} `
 						const styled =
@@ -229,18 +301,30 @@ export function registerCodexCommand(pi: ExtensionAPI, setConfigByScope: (config
 					if (tab) addWrappedWithPrefix(" ", `${theme.fg("accent", theme.bold(`${tab.label} config`))} ${theme.fg("dim", tab.path)}`)
 					lines.push("")
 
-					const gptPrefix = theme.fg(currentSetting === 0 ? "accent" : "muted", currentSetting === 0 ? "> " : "  ")
+					const gptPrefix = theme.fg(selected("gpt") ? "accent" : "muted", selected("gpt") ? "> " : "  ")
 					const gptValue = theme.fg(rawMode === "unset" ? "muted" : "accent", rawMode)
 					const gptNote = note ? ` ${theme.fg("muted", `(${note})`)}` : ""
 					addWrappedWithPrefix(gptPrefix, `${theme.fg("text", "GPT mode")}  ${gptValue}${gptNote}`)
 
-					const patchPrefix = theme.fg(currentSetting === 1 ? "accent" : "muted", currentSetting === 1 ? "> " : "  ")
-					const patchValue = theme.fg(applyPatchMode === "unset" ? "muted" : "accent", applyPatchMode)
-					const patchNote = applyPatchNote ? ` ${theme.fg("muted", `(${applyPatchNote})`)}` : ""
-					addWrappedWithPrefix(patchPrefix, `${theme.fg("text", "apply_patch")}  ${patchValue}${patchNote}`)
+					const patchPrefix = theme.fg(selected("applyPatchAdd") ? "accent" : "muted", selected("applyPatchAdd") ? "> " : "  ")
+					const patchValue = theme.fg(applyPatchAddMode === "unset" ? "muted" : "accent", applyPatchAddMode)
+					const patchNote = applyPatchAddNote ? ` ${theme.fg("muted", `(${applyPatchAddNote})`)}` : ""
+					addWrappedWithPrefix(patchPrefix, `${theme.fg("text", "add apply_patch")}  ${patchValue}${patchNote}`)
+
+					if (rows.includes("disableWrite")) {
+						const writePrefix = theme.fg(selected("disableWrite") ? "accent" : "muted", selected("disableWrite") ? ">   " : "    ")
+						const writeValue = theme.fg(disableWriteMode === "unset" ? "muted" : "accent", disableWriteMode)
+						const writeNote = disableWriteNote ? ` ${theme.fg("muted", `(${disableWriteNote})`)}` : ""
+						addWrappedWithPrefix(writePrefix, `${theme.fg("text", "disable write")}  ${writeValue}${writeNote}`)
+
+						const editPrefix = theme.fg(selected("disableEdit") ? "accent" : "muted", selected("disableEdit") ? ">   " : "    ")
+						const editValue = theme.fg(disableEditMode === "unset" ? "muted" : "accent", disableEditMode)
+						const editNote = disableEditNote ? ` ${theme.fg("muted", `(${disableEditNote})`)}` : ""
+						addWrappedWithPrefix(editPrefix, `${theme.fg("text", "disable edit")}  ${editValue}${editNote}`)
+					}
 					lines.push(theme.fg("dim", `  ${"─".repeat(Math.max(1, renderWidth - 2))}`))
 
-					const resetPrefix = theme.fg(currentSetting === 2 ? "accent" : "muted", currentSetting === 2 ? "> " : "  ")
+					const resetPrefix = theme.fg(selected("reset") ? "accent" : "muted", selected("reset") ? "> " : "  ")
 					addWrappedWithPrefix(
 						resetPrefix,
 						`${theme.fg("text", "Reset to default")}  ${theme.fg("muted", "delete this scope config file")}`
