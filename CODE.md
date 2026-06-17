@@ -121,7 +121,7 @@ UI:
 - rows:
   - `GPT mode`: `unset`, `default`, `fast`, `fast-codex`
   - `apply_patch`: `unset`, `disabled`, `enabled`, `replace-edit`
-  - `Reset to default`: deletes active scope config file
+  - `Reset to default`: separated destructive action; deletes active scope config file
 - notes explain effective value:
   - workspace override
   - user inheritance

@@ -238,6 +238,7 @@ export function registerCodexCommand(pi: ExtensionAPI, setConfigByScope: (config
 					const patchValue = theme.fg(applyPatchMode === "unset" ? "muted" : "accent", applyPatchMode)
 					const patchNote = applyPatchNote ? ` ${theme.fg("muted", `(${applyPatchNote})`)}` : ""
 					addWrappedWithPrefix(patchPrefix, `${theme.fg("text", "apply_patch")}  ${patchValue}${patchNote}`)
+					lines.push(theme.fg("dim", `  ${"─".repeat(Math.max(1, renderWidth - 2))}`))
 
 					const resetPrefix = theme.fg(currentSetting === 2 ? "accent" : "muted", currentSetting === 2 ? "> " : "  ")
 					addWrappedWithPrefix(
