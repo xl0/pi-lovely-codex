@@ -7,6 +7,7 @@ Maintain 2 important files in sync with the codebase:
 
 IMPORTANT: At the start of each conversation, always fully read `CODE.md`. You may read `PLAN.md` when relevant to the task.
 Update the files as you go, keep the updates concise. Not a changelog - content reflects the current state, not history.
+Don't put too much on one line, keep things readeable.
 
 # Guidelines
 
