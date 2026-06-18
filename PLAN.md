@@ -3,7 +3,7 @@
 ## High-level decisions
 - Package is `@xl0/pi-lovely-codex`.
 - Keep package boilerplate aligned with `pi-lovely-dev-tools` and `pi-lovely-web`.
-- GPT mode config lives in `xl0-pi-lovely-codex.json` under User `~/.pi/agent/` and Workspace `.pi/`; Workspace overrides User. Omitted `gptMode` is unset; effective mode falls through to User or default. Runtime keeps configs by scope in memory; command writes only touched scope. Invalid session reload fails closed to default; command warns and ignores only bad scope.
+- GPT mode config lives in `xl0-pi-lovely-codex.json` under User `~/.pi/agent/` and Workspace `.pi/`; Workspace overrides User. Omitted `gptMode` is unset; effective mode falls through to User or default. Runtime keeps configs by scope in memory; command writes only touched scope. Invalid JSON/schema is treated like missing config for that scope and overwritten on save.
 - Non-default GPT mode shows `🏎️` in the status line; `default` clears the indicator.
 - GPT modes map to OpenAI service tiers: `default` -> omit service tier, `fast` -> priority for `openai` and `openai-codex`, `fast-codex` -> priority only for `openai-codex`.
 - Apply service-tier payload only to OpenAI GPT models (`provider` `openai`/`openai-codex`, id starts `gpt-`) to avoid breaking other OpenAI-compatible providers.
@@ -35,9 +35,9 @@ Current scope:
 - fixed User/Workspace scopes
 - shallow merge, Workspace overrides User
 - flat persisted keys; field `children` are UI-only
-- field defaults drive notes and visibility, not persisted output
+- field defaults drive typed `get()`, notes, and visibility, not persisted output
 - supported field kinds: `enum`, `boolean`
-- field descriptors derive TypeBox schema
+- field descriptors derive TypeBox schema and config definition objects
 - helper owns config IO and TUI command UI
 - caller owns runtime side effects via `onChange(effective, scoped, ctx)`
 - immediate writes on field change; unset removes key

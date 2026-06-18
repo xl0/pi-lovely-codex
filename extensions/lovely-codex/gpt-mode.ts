@@ -1,10 +1,10 @@
 import type { Usage } from "@earendil-works/pi-ai"
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent"
-import type { GptMode } from "./config.js"
+import type { CodexConfig } from "./config.js"
 
 const serviceTierProviders = new Set(["openai", "openai-codex"])
 
-export function registerGptModeHooks(pi: ExtensionAPI, getMode: () => GptMode) {
+export function registerGptModeHooks(pi: ExtensionAPI, getMode: () => NonNullable<CodexConfig["gptMode"]>) {
 	pi.on("before_provider_request", (event, ctx) => {
 		const model = ctx.model
 		if (!model?.id.startsWith("gpt-") || !serviceTierProviders.has(model.provider)) return
