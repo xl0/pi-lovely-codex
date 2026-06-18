@@ -1,14 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
-import { type ExtensionAPI, type ExtensionContext, getAgentDir } from "@earendil-works/pi-coding-agent"
+import { CONFIG_DIR_NAME, type ExtensionAPI, type ExtensionContext, getAgentDir } from "@earendil-works/pi-coding-agent"
 import { Key, matchesKey, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui"
-import { type TSchema, Type } from "typebox"
+import { type Static, type TBoolean, type TLiteral, type TObject, type TOptional, type TSchema, type TUnion, Type } from "typebox"
 import Schema from "typebox/schema"
 
 export type ConfigScope = "global" | "project"
 export type ScopedConfig<Config extends object> = Record<ConfigScope, Config>
 
 type FieldKind = "enum" | "boolean"
+type EnumValues = readonly [string, ...string[]]
 
 type VisibilityContext = {
 	get(key: string): unknown
@@ -26,7 +27,7 @@ type BaseField = {
 
 export type EnumConfigField = BaseField & {
 	kind: "enum"
-	values: readonly string[]
+	values: EnumValues
 	default: string
 }
 
@@ -37,15 +38,34 @@ export type BooleanConfigField = BaseField & {
 
 export type ScopedConfigField = EnumConfigField | BooleanConfigField
 
+type FieldUnion<Fields extends readonly ScopedConfigField[]> = Fields[number] | ChildFieldUnion<Fields[number]>
+type ChildFieldUnion<Field> = Field extends { children: infer Children extends readonly ScopedConfigField[] } ? FieldUnion<Children> : never
+type LiteralSchemas<Values extends readonly string[]> = Values extends readonly [infer First extends string, ...infer Rest extends string[]]
+	? [TLiteral<First>, ...LiteralSchemas<Rest>]
+	: []
+type FieldSchema<Field extends ScopedConfigField> = Field extends { kind: "enum"; values: infer Values extends EnumValues }
+	? TOptional<TUnion<LiteralSchemas<Values>>>
+	: Field extends { kind: "boolean" }
+		? TOptional<TBoolean>
+		: never
+type UnionToIntersection<Union> = (Union extends unknown ? (value: Union) => void : never) extends (value: infer Intersection) => void
+	? Intersection
+	: never
+type FieldProperty<Field extends ScopedConfigField> = Field extends unknown ? { [Key in Field["key"]]: FieldSchema<Field> } : never
+type SchemaProperties<Fields extends readonly ScopedConfigField[]> =
+	UnionToIntersection<FieldProperty<FieldUnion<Fields>>> extends infer Properties ? { [Key in keyof Properties]: Properties[Key] } : never
+type FieldDefaultProperty<Field extends ScopedConfigField> = Field extends unknown ? { [Key in Field["key"]]: Field["default"] } : never
+type DefaultValues<Fields extends readonly ScopedConfigField[]> =
+	UnionToIntersection<FieldDefaultProperty<FieldUnion<Fields>>> extends infer Defaults ? { [Key in keyof Defaults]: Defaults[Key] } : never
+type ConfigFromFields<Fields extends readonly ScopedConfigField[]> = Static<TObject<SchemaProperties<Fields>>>
+
 type FlatField = ScopedConfigField & { depth: number }
 type Row = { kind: "field"; field: FlatField } | { kind: "reset" }
 
 type ScopedConfigCommandOptions<Config extends object> = {
 	command: string
 	description: string
-	title: string
-	fileName: string
-	fields: readonly ScopedConfigField[]
+	config: ScopedConfigDefinition<Config>
 	onChange: (effective: Config, scoped: ScopedConfig<Config>, ctx: ExtensionContext) => void
 }
 
@@ -59,29 +79,57 @@ type ScopedConfigIO<Config extends object> = {
 	load(cwd: string): Config
 }
 
+export type ScopedConfigDefinition<Config extends object> = ScopedConfigIO<Config> & {
+	fileName: string
+	fields: readonly ScopedConfigField[]
+	schema: TSchema
+	defaults: Record<string, unknown>
+	get<Key extends keyof Config>(config: Config, key: Key): NonNullable<Config[Key]>
+}
+
 const scopeTabs: Array<{ scope: ConfigScope; label: string }> = [
 	{ scope: "global", label: "User" },
 	{ scope: "project", label: "Workspace" }
 ]
 
-export function createScopedConfigSchema(fields: readonly ScopedConfigField[]) {
+export function createScopedConfigSchema<const Fields extends readonly ScopedConfigField[]>(
+	fields: Fields
+): TObject<SchemaProperties<Fields>> {
 	const properties: Record<string, TSchema> = {}
 	for (const field of flattenFields(fields)) {
 		if (properties[field.key]) continue
 		properties[field.key] = Type.Optional(createFieldSchema(field))
 	}
-	return Type.Object(properties)
+	return Type.Object(properties) as TObject<SchemaProperties<Fields>>
 }
 
-export function createScopedConfigIO<Config extends object>(options: {
+export function defineScopedConfig<const Fields extends readonly ScopedConfigField[]>(options: {
 	fileName: string
-	title: string
-	schema: TSchema
-}): ScopedConfigIO<Config> {
+	fields: Fields
+}): ScopedConfigDefinition<ConfigFromFields<Fields>> & {
+	fields: Fields
+	schema: TObject<SchemaProperties<Fields>>
+	defaults: DefaultValues<Fields>
+} {
+	const schema = createScopedConfigSchema(options.fields)
+	const defaults = defaultConfig(schema) as DefaultValues<Fields>
+	const io = createScopedConfigIO<ConfigFromFields<Fields>>({ fileName: options.fileName, schema })
+	function get<Key extends keyof ConfigFromFields<Fields>>(
+		config: ConfigFromFields<Fields>,
+		key: Key
+	): NonNullable<ConfigFromFields<Fields>[Key]> {
+		const value = getConfigValue(config, String(key))
+		return (value === undefined ? defaults[key as keyof DefaultValues<Fields>] : value) as NonNullable<ConfigFromFields<Fields>[Key]>
+	}
+
+	return { ...io, fileName: options.fileName, fields: options.fields, schema, defaults, get }
+}
+
+export function createScopedConfigIO<Config extends object>(options: { fileName: string; schema: TSchema }): ScopedConfigIO<Config> {
 	const validator = Schema.Compile(options.schema)
 
 	function getPath(scope: ConfigScope, cwd: string): string {
-		return scope === "global" ? join(getAgentDir(), options.fileName) : resolve(cwd, ".pi", options.fileName)
+		return scope === "global" ? join(getAgentDir(), options.fileName) : resolve(cwd, CONFIG_DIR_NAME, options.fileName)
 	}
 
 	function readFile(path: string): Config {
@@ -89,8 +137,8 @@ export function createScopedConfigIO<Config extends object>(options: {
 		const raw = readFileSync(path, "utf-8")
 		try {
 			return validator.Parse(JSON.parse(raw)) as Config
-		} catch (error) {
-			throw new Error(`Could not parse ${options.title} config at ${path}: ${error instanceof Error ? error.message : String(error)}`)
+		} catch {
+			return {} as Config
 		}
 	}
 
@@ -122,19 +170,15 @@ export function createScopedConfigIO<Config extends object>(options: {
 }
 
 export function createScopedConfigCommand<Config extends object>(options: ScopedConfigCommandOptions<Config>) {
-	const io = createScopedConfigIO<Config>({
-		fileName: options.fileName,
-		title: options.title,
-		schema: createScopedConfigSchema(options.fields)
-	})
-	const allFields = flattenFields(options.fields)
-	const defaults = defaultConfig(allFields)
+	const configDefinition = options.config
+	const allFields = flattenFields(configDefinition.fields)
+	const defaults = configDefinition.defaults
 
 	return (pi: ExtensionAPI) => {
 		pi.registerCommand(options.command, {
 			description: options.description,
 			async handler(_args, ctx) {
-				let configs = loadCommandConfig(ctx, io, options.title)
+				let configs = loadCommandConfig(ctx, configDefinition)
 
 				if (ctx.mode !== "tui") {
 					ctx.ui.notify(`The interactive /${options.command} settings UI is only available in TUI mode.`, "warning")
@@ -173,15 +217,15 @@ export function createScopedConfigCommand<Config extends object>(options: Scoped
 
 					function save(scope: ConfigScope, config: Config) {
 						configs = { ...configs, [scope]: config }
-						io.writeFile(io.getPath(scope, ctx.cwd), config)
-						options.onChange(io.merge(configs), configs, ctx)
+						configDefinition.writeFile(configDefinition.getPath(scope, ctx.cwd), config)
+						options.onChange(configDefinition.merge(configs), configs, ctx)
 						refresh()
 					}
 
 					function reset(scope: ConfigScope) {
 						configs = { ...configs, [scope]: {} as Config }
-						io.deleteFile(io.getPath(scope, ctx.cwd))
-						options.onChange(io.merge(configs), configs, ctx)
+						configDefinition.deleteFile(configDefinition.getPath(scope, ctx.cwd))
+						options.onChange(configDefinition.merge(configs), configs, ctx)
 						refresh()
 					}
 
@@ -259,7 +303,8 @@ export function createScopedConfigCommand<Config extends object>(options: Scoped
 
 						const tab = scopeTabs[currentTab]
 						if (tab) {
-							const path = tab.scope === "global" ? `~/.pi/agent/${options.fileName}` : `.pi/${options.fileName}`
+							const path =
+								tab.scope === "global" ? `~/.pi/agent/${configDefinition.fileName}` : `${CONFIG_DIR_NAME}/${configDefinition.fileName}`
 							addWrappedWithPrefix(" ", `${theme.fg("accent", theme.bold(`${tab.label} config`))} ${theme.fg("dim", path)}`)
 						}
 						lines.push("")
@@ -306,9 +351,9 @@ function createFieldSchema(field: ScopedConfigField): TSchema {
 	switch (field.kind) {
 		case "enum":
 			if (field.values.length === 0) throw new Error(`Enum field ${field.key} must have at least one value`)
-			return Type.Union(field.values.map(value => Type.Literal(value)) as unknown as [TSchema, ...TSchema[]])
+			return Type.Union(field.values.map(value => Type.Literal(value)) as unknown as [TSchema, ...TSchema[]], { default: field.default })
 		case "boolean":
-			return Type.Boolean()
+			return Type.Boolean({ default: field.default })
 	}
 }
 
@@ -321,13 +366,15 @@ function flattenFields(fields: readonly ScopedConfigField[], depth = 0): FlatFie
 	return flattened
 }
 
-function defaultConfig(fields: readonly ScopedConfigField[]): Record<string, unknown> {
+function defaultConfig(schema: TObject): Record<string, unknown> {
 	const defaults: Record<string, unknown> = {}
-	for (const field of fields) defaults[field.key] = field.default
+	for (const [key, property] of Object.entries(schema.properties)) {
+		defaults[key] = (property as TSchema & { default: unknown }).default
+	}
 	return defaults
 }
 
-function loadCommandConfig<Config extends object>(ctx: ExtensionContext, io: ScopedConfigIO<Config>, title: string): ScopedConfig<Config> {
+function loadCommandConfig<Config extends object>(ctx: ExtensionContext, io: ScopedConfigDefinition<Config>): ScopedConfig<Config> {
 	const config: ScopedConfig<Config> = { global: {} as Config, project: {} as Config }
 	for (const scope of ["global", "project"] as const) {
 		const path = io.getPath(scope, ctx.cwd)
@@ -335,7 +382,7 @@ function loadCommandConfig<Config extends object>(ctx: ExtensionContext, io: Sco
 			config[scope] = io.readFile(path)
 		} catch (error) {
 			ctx.ui.notify(
-				`${title} ignored bad ${scope === "global" ? "User" : "Workspace"} config at ${path}: ${error instanceof Error ? error.message : String(error)}`,
+				`${io.fileName} ignored unreadable ${scope === "global" ? "User" : "Workspace"} config at ${path}: ${error instanceof Error ? error.message : String(error)}`,
 				"warning"
 			)
 		}

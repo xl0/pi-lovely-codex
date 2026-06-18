@@ -26,7 +26,9 @@ State below describes current codebase, not history.
 
 ## Config model
 
-Implemented in `extensions/lovely-codex/config.ts`, driven by field descriptors in `codexConfigFields`.
+Implemented in `extensions/lovely-codex/config.ts` as `codexConfig = defineScopedConfig(...)`.
+Field descriptors are the single source of truth; generated TypeBox schema carries defaults, and the config object derives IO plus typed access from it.
+`CodexConfig` is derived from `Static<typeof codexConfig.schema>`.
 
 Config schema:
 
@@ -41,7 +43,7 @@ Config schema:
 
 All fields are optional. Omitted means unset in that scope.
 
-Defaults after scope merge:
+Defaults after scope merge, exposed as `codexConfig.defaults`:
 
 - `gptMode`: `default`
 - `applyPatchAddMode`: `gpt-only`
@@ -51,7 +53,7 @@ Defaults after scope merge:
 Scopes:
 
 - global: `${getAgentDir()}/xl0-pi-lovely-codex.json` (default `~/.pi/agent/...`)
-- project: `<cwd>/.pi/xl0-pi-lovely-codex.json`
+- project: `<cwd>/${CONFIG_DIR_NAME}/xl0-pi-lovely-codex.json` (default `<cwd>/.pi/...`)
 
 Project overrides global through shallow merge:
 
@@ -60,7 +62,7 @@ Project overrides global through shallow merge:
 ```
 
 Config IO is sync and TypeBox-validated through the internal scoped-config helper.
-Missing files load as `{}`. Invalid JSON/schema throws a config error with file path.
+Missing files and invalid JSON/schema load as `{}` for that scope; next save overwrites the file.
 Resetting a scope deletes its config file; missing file is OK.
 
 ## Extension lifecycle
@@ -80,12 +82,12 @@ On `session_start`:
 3. apply tool config to active tools
 4. update `lovely-codex` status indicator
 
-If config loading fails:
+If config loading fails due to an unreadable file or other IO error:
 
 - config resets to empty scopes
 - tool config applies defaults
 - status clears
-- UI shows error notification
+- UI shows error notification keyed by config filename
 
 Registered features:
 
@@ -119,13 +121,14 @@ Implemented in `extensions/lovely-codex/scoped-config-command.ts`.
 
 Internal helper exports:
 
-- `createScopedConfigSchema(fields)`: derives flat TypeBox schema from field descriptors
-- `createScopedConfigIO({ fileName, title, schema })`: sync scoped config paths, load, write, delete, shallow merge
-- `createScopedConfigCommand(options)`: registers a TUI User/Workspace config editor
+- `defineScopedConfig({ fileName, fields })`: builds schema-backed defaults, typed `get()`, and scoped IO
+- `createScopedConfigSchema(fields)`: derives flat TypeBox schema and preserves static TypeBox types from field descriptors
+- `createScopedConfigIO({ fileName, schema })`: sync scoped config paths, load, write, delete, shallow merge
+- `createScopedConfigCommand({ config, ... })`: registers a TUI User/Workspace config editor
 
 Supported field kinds: `enum`, `boolean`.
 Persisted keys are flat; `children` only controls UI nesting.
-Defaults live on fields and are used for UI notes/visibility, not persisted.
+Defaults originate on fields, are written into generated schema, are exposed through config definitions, and are used for typed `get()`, UI notes, and visibility; defaults are not persisted.
 `visibleWhen` reads default-filled effective config through `get()` and can read scoped values through `getScoped()`.
 Hidden fields stay persisted/effective.
 Writes are immediate per field cycle; unset deletes only that key.
@@ -161,8 +164,8 @@ Save behavior:
 - updates status indicator
 - reset clears active scope in memory, deletes its file, then reapplies state
 
-If one scoped config is invalid, command warns and opens that scope empty;
-other scope still loads.
+If one scoped config is invalid JSON/schema, command opens that scope empty;
+other scope still loads. The next save overwrites the invalid file.
 
 ## GPT mode hooks
 
