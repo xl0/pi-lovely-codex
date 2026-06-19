@@ -26,9 +26,10 @@ State below describes current codebase, not history.
 
 ## Config model
 
-Implemented in `extensions/lovely-codex/config.ts` as `codexConfig = defineScopedConfig(...)`.
-Field descriptors are the single source of truth; generated TypeBox schema carries defaults, and the config object derives IO plus typed access from it.
-`CodexConfig` is derived from `Static<typeof codexConfig.schema>`.
+Implemented in `extensions/lovely-codex/config.ts` as explicit `CodexConfig` plus
+`codexConfig = defineScopedConfig<CodexConfig>(...)`.
+Field descriptors drive runtime schema/defaults/UI, and the explicit config type
+keeps TS access simple.
 
 Config schema:
 
@@ -91,7 +92,7 @@ If config loading fails due to an unreadable file or other IO error:
 
 Registered features:
 
-- `/codex` command
+- `/lovely-codex` command
 - GPT mode request/message hooks
 - `apply_patch` tool
 
@@ -117,14 +118,15 @@ Baseline prevents extension from enabling tools that were not active before it r
 
 ## Scoped config helper
 
-Implemented in `extensions/lovely-codex/scoped-config-command.ts`.
+Implemented in `extensions/lovely-codex/scoped-config.ts`.
 
 Internal helper exports:
 
-- `defineScopedConfig({ fileName, fields })`: builds schema-backed defaults, typed `get()`, and scoped IO
-- `createScopedConfigSchema(fields)`: derives flat TypeBox schema and preserves static TypeBox types from field descriptors
+- `defineScopedConfig<Config>({ fileName, fields })`: builds schema-backed defaults, typed `get()`, and scoped IO
+- `createScopedConfigSchema(fields)`: derives flat runtime TypeBox schema from field descriptors
 - `createScopedConfigIO({ fileName, schema })`: sync scoped config paths, load, write, delete, shallow merge
-- `createScopedConfigCommand({ config, ... })`: registers a TUI User/Workspace config editor
+- `createScopedConfigEditor({ config, ... })`: creates reusable User/Workspace TUI config editor UI
+- TUI config editor state/render/input lives in `ScopedConfigEditor` component.
 
 Supported field kinds: `enum`, `boolean`.
 Persisted keys are flat; `children` only controls UI nesting.
@@ -135,9 +137,9 @@ Writes are immediate per field cycle; unset deletes only that key.
 Reset deletes the active scope file.
 Caller owns runtime side effects through `onChange(effective, scoped, ctx)`.
 
-## `/codex` command
+## `/lovely-codex` command
 
-Registered in `extensions/lovely-codex/index.ts` using the scoped config helper.
+Registered in `extensions/lovely-codex/index.ts`; scoped config helper only supplies config IO and editor UI.
 
 Command takes no args and opens a TUI config editor.
 
@@ -259,7 +261,7 @@ Apply-patch tests live under `tests/apply-patch/`.
 - `tsconfig.json`: strict TypeScript for `extensions/` and `tests/`.
 - `biome.json`: formatter/linter config aligned with adjacent Pi Lovely packages.
 - `bun.lock`: dependency lock from `bun install`.
-- `README.md`: user docs for install, `/codex`, scoped config, GPT modes,
+- `README.md`: user docs for install, `/lovely-codex`, scoped config, GPT modes,
   apply-patch modes, and Codex CLI requirement.
 - `docs/APPLY_PATCH_REPORT.md`: source-level notes from Pi `apply_patch`
   review in `pi-codex-conversion`; reference for possible native impl.

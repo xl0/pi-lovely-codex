@@ -15,7 +15,7 @@ export function registerGptModeHooks(pi: ExtensionAPI, getMode: () => NonNullabl
 	})
 
 	pi.on("message_end", event => {
-		// Uses current mode; changing /codex mid-stream can skew cost display, but billing unaffected.
+		// Uses current mode; changing /lovely-codex mid-stream can skew cost display, but billing unaffected.
 		if (event.message.role !== "assistant") return
 		if (event.message.provider !== "openai-codex" || !event.message.model.startsWith("gpt-")) return
 		const mode = getMode()

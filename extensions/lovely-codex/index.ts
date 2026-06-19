@@ -1,8 +1,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
 import { registerApplyPatchTool } from "./apply-patch.js"
-import { type CodexConfig, codexConfig } from "./config.js"
+import { type CodexConfig, codexConfig, type ScopedCodexConfig } from "./config.js"
 import { registerGptModeHooks } from "./gpt-mode.js"
-import { createScopedConfigCommand } from "./scoped-config-command.js"
+import { createScopedConfigEditor } from "./scoped-config.js"
 
 function isGptModel(model: ExtensionContext["model"]): boolean {
 	return model?.id.startsWith("gpt-") || model?.id.includes("/gpt-") || false
@@ -62,14 +62,46 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 		applyToolConfig()
 	})
 
-	createScopedConfigCommand<CodexConfig>({
-		command: "codex",
+	pi.registerCommand("lovely-codex", {
 		description: "Configure Lovely Codex settings",
-		config: codexConfig,
-		onChange(effective, _scoped, ctx) {
-			setConfig(effective, ctx)
+		async handler(_args, ctx) {
+			const scoped = loadCommandConfig(ctx)
+
+			if (ctx.mode !== "tui") {
+				ctx.ui.notify("The interactive /lovely-codex settings UI is only available in TUI mode.", "warning")
+				return
+			}
+
+			await ctx.ui.custom<void>((tui, theme, _keybindings, done) =>
+				createScopedConfigEditor({
+					tui,
+					theme,
+					ctx,
+					config: codexConfig,
+					scoped,
+					onChange(effective) {
+						setConfig(effective, ctx)
+					},
+					done
+				})
+			)
 		}
-	})(pi)
+	})
 	registerGptModeHooks(pi, getMode)
 	registerApplyPatchTool(pi)
+}
+
+function loadCommandConfig(ctx: ExtensionContext): ScopedCodexConfig {
+	const config: ScopedCodexConfig = { global: {}, project: {} }
+	for (const scope of ["global", "project"] as const) {
+		const path = codexConfig.getPath(scope, ctx.cwd)
+		try {
+			config[scope] = codexConfig.readFile(path)
+		} catch (error) {
+			const label = scope === "global" ? "User" : "Workspace"
+			const message = error instanceof Error ? error.message : String(error)
+			ctx.ui.notify(`${codexConfig.fileName} ignored unreadable ${label} config at ${path}: ${message}`, "warning")
+		}
+	}
+	return config
 }
