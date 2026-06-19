@@ -92,13 +92,13 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 }
 
 function loadCommandConfig(ctx: ExtensionContext): ScopedCodexConfig {
-	const config: ScopedCodexConfig = { global: {}, project: {} }
-	for (const scope of ["global", "project"] as const) {
+	const config: ScopedCodexConfig = { user: {}, workspace: {} }
+	for (const scope of ["user", "workspace"] as const) {
 		const path = codexConfig.getPath(scope, ctx.cwd)
 		try {
 			config[scope] = codexConfig.readFile(path)
 		} catch (error) {
-			const label = scope === "global" ? "User" : "Workspace"
+			const label = `${scope[0]?.toUpperCase() ?? ""}${scope.slice(1)}`
 			const message = error instanceof Error ? error.message : String(error)
 			ctx.ui.notify(`${codexConfig.fileName} ignored unreadable ${label} config at ${path}: ${message}`, "warning")
 		}
