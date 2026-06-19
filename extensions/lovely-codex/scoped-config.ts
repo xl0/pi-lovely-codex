@@ -5,7 +5,7 @@ import { Key, matchesKey, visibleWidth, wrapTextWithAnsi } from "@earendil-works
 import { type TObject, type TSchema, Type } from "typebox"
 import Schema from "typebox/schema"
 
-export type ConfigScope = "global" | "project"
+export type ConfigScope = "user" | "workspace"
 export type ScopedConfig<Config extends object> = Record<ConfigScope, Config>
 
 type EnumValues = readonly [string, ...string[]]
@@ -63,10 +63,7 @@ export type ScopedConfigDefinition<Config extends object> = ScopedConfigIO<Confi
 	get<Key extends keyof Config>(config: Config, key: Key): NonNullable<Config[Key]>
 }
 
-const scopeTabs: Array<{ scope: ConfigScope; label: string }> = [
-	{ scope: "global", label: "User" },
-	{ scope: "project", label: "Workspace" }
-]
+const scopeTabs: ConfigScope[] = ["user", "workspace"]
 
 export function createScopedConfigSchema(fields: readonly ScopedConfigField[]): TObject {
 	const properties: Record<string, TSchema> = {}
@@ -102,7 +99,7 @@ export function createScopedConfigIO<Config extends object>(options: { fileName:
 	const validator = Schema.Compile(options.schema)
 
 	function getPath(scope: ConfigScope, cwd: string): string {
-		return scope === "global" ? join(getAgentDir(), options.fileName) : resolve(cwd, CONFIG_DIR_NAME, options.fileName)
+		return scope === "user" ? join(getAgentDir(), options.fileName) : resolve(cwd, CONFIG_DIR_NAME, options.fileName)
 	}
 
 	function readFile(path: string): Config {
@@ -125,13 +122,13 @@ export function createScopedConfigIO<Config extends object>(options: { fileName:
 	}
 
 	function merge(scoped: ScopedConfig<Config>): Config {
-		return { ...scoped.global, ...scoped.project }
+		return { ...scoped.user, ...scoped.workspace }
 	}
 
 	function loadScoped(cwd: string): ScopedConfig<Config> {
 		return {
-			global: readFile(getPath("global", cwd)),
-			project: readFile(getPath("project", cwd))
+			user: readFile(getPath("user", cwd)),
+			workspace: readFile(getPath("workspace", cwd))
 		}
 	}
 
@@ -235,9 +232,9 @@ class ScopedConfigEditor<Config extends object> {
 
 	private renderTabs(lines: string[], width: number): void {
 		const tabs = ["← "]
-		for (const [index, tab] of scopeTabs.entries()) {
-			const isUnset = this.scopeIsUnset(tab.scope)
-			const text = ` ${isUnset ? "□" : "■"} ${tab.label} `
+		for (const [index, scope] of scopeTabs.entries()) {
+			const isUnset = this.scopeIsUnset(scope)
+			const text = ` ${isUnset ? "□" : "■"} ${scopeLabel(scope)} `
 			const styled =
 				index === this.currentTab
 					? this.theme.bg("selectedBg", this.theme.fg("text", text))
@@ -249,15 +246,15 @@ class ScopedConfigEditor<Config extends object> {
 	}
 
 	private renderScopeHeader(lines: string[], width: number): void {
-		const tab = scopeTabs[this.currentTab]
-		if (!tab) return
+		const scope = scopeTabs[this.currentTab]
+		if (!scope) return
 
-		const path = this.config.getPath(tab.scope, this.ctx.cwd)
+		const path = this.config.getPath(scope, this.ctx.cwd)
 		addWrappedWithPrefix(
 			lines,
 			width,
 			" ",
-			`${this.theme.fg("accent", this.theme.bold(`${tab.label} config`))} ${this.theme.fg("dim", path)}`
+			`${this.theme.fg("accent", this.theme.bold(`${scopeLabel(scope)} config`))} ${this.theme.fg("dim", path)}`
 		)
 	}
 
@@ -295,11 +292,11 @@ class ScopedConfigEditor<Config extends object> {
 	}
 
 	private currentScope(): ConfigScope {
-		return scopeTabs[this.currentTab]?.scope ?? "global"
+		return scopeTabs[this.currentTab] ?? "user"
 	}
 
 	private resolvedConfig(scope: ConfigScope): Record<string, unknown> {
-		return { ...this.defaults, ...this.configs.global, ...(scope === "project" ? this.configs.project : {}) }
+		return { ...this.defaults, ...this.configs.user, ...(scope === "workspace" ? this.configs.workspace : {}) }
 	}
 
 	private rows(scope: ConfigScope = this.currentScope()): Row[] {
@@ -442,15 +439,15 @@ function getScopeNote<Config extends object>(
 	configs: ScopedConfig<Config>,
 	field: ScopedConfigField
 ): string | undefined {
-	const userValue = getConfigValue(configs.global, field.key)
-	const workspaceValue = getConfigValue(configs.project, field.key)
+	const userValue = getConfigValue(configs.user, field.key)
+	const workspaceValue = getConfigValue(configs.workspace, field.key)
 	const user = userValue === undefined ? undefined : formatFieldValue(field, userValue)
 	const workspace = workspaceValue === undefined ? undefined : formatFieldValue(field, workspaceValue)
 	const defaultValue = formatFieldValue(field, field.default)
 
 	if (user === undefined && workspace === undefined) return `uses default: ${defaultValue}`
 
-	if (scope === "global") {
+	if (scope === "user") {
 		if (user !== undefined && workspace !== undefined) return `Workspace overrides with: ${workspace}`
 		if (user === undefined && workspace !== undefined) return `Workspace sets: ${workspace}`
 		return undefined
@@ -460,4 +457,8 @@ function getScopeNote<Config extends object>(
 	if (workspace !== undefined && user !== undefined) return workspace === user ? `same as User: ${user}` : `overrides User: ${user}`
 	if (workspace !== undefined && user === undefined) return `overrides default: ${defaultValue}`
 	return undefined
+}
+
+function scopeLabel(scope: ConfigScope): string {
+	return `${scope[0]?.toUpperCase() ?? ""}${scope.slice(1)}`
 }
