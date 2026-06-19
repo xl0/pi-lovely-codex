@@ -1,9 +1,15 @@
-import type { Static } from "typebox"
-import { type ConfigScope, defineScopedConfig, type ScopedConfig, type ScopedConfigField } from "./scoped-config-command.js"
+import { type ConfigScope, defineScopedConfig, type ScopedConfig, type ScopedConfigField } from "./scoped-config.js"
 
 export const CONFIG_FILE_NAME = "xl0-pi-lovely-codex.json"
 
-export const codexConfig = defineScopedConfig({
+export type CodexConfig = {
+	gptMode?: "default" | "fast" | "fast-codex"
+	applyPatchAddMode?: "on" | "off" | "gpt-only"
+	disableWrite?: boolean
+	disableEdit?: boolean
+}
+
+export const codexConfig = defineScopedConfig<CodexConfig>({
 	fileName: CONFIG_FILE_NAME,
 	fields: [
 		{
@@ -39,6 +45,5 @@ export const codexConfig = defineScopedConfig({
 	] as const satisfies readonly ScopedConfigField[]
 })
 
-export type CodexConfig = Static<typeof codexConfig.schema>
 export type { ConfigScope }
 export type ScopedCodexConfig = ScopedConfig<CodexConfig>

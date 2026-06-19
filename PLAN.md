@@ -16,19 +16,20 @@
 - [x] Add TypeScript/Biome tooling config.
 - [x] Add README, LICENSE, `.gitignore`.
 - [x] Add CODE/PLAN docs.
-- [x] Add no-arg `/codex` tabbed User/Workspace mode config command with unset support.
+- [x] Add no-arg `/lovely-codex` tabbed User/Workspace mode config command with unset support.
 - [x] Inject GPT service-tier payload from config.
 - [x] Adjust Codex cost for priority mode.
 - [x] Add Codex-backed `apply_patch` black-box test harness.
 - [x] Copy upstream scenario fixtures into repo.
 - [x] Add Pi `apply_patch` runner to same harness.
-- [x] Extract internal schema-driven scoped config helper and port `/codex`.
+- [x] Extract internal schema-driven scoped config helper and port `/lovely-codex`.
+- [ ] Show a warning when scoped config JSON/schema is invalid and ignored.
 - [ ] Add string/number field UX before extracting helper to shared package.
 - [ ] Replace Codex-wrapper `apply_patch` with native Pi implementation.
 
 ## Scoped config helper extraction
 
-Implemented internally in `extensions/lovely-codex/scoped-config-command.ts`.
+Implemented internally in `extensions/lovely-codex/scoped-config.ts`.
 
 Current scope:
 
@@ -38,7 +39,7 @@ Current scope:
 - field defaults drive typed `get()`, notes, and visibility, not persisted output
 - supported field kinds: `enum`, `boolean`
 - field descriptors derive TypeBox schema and config definition objects
-- helper owns config IO and TUI command UI
+- helper owns config IO and reusable TUI editor UI; command registration stays in extension code
 - caller owns runtime side effects via `onChange(effective, scoped, ctx)`
 - immediate writes on field change; unset removes key
 - reset deletes active scope file

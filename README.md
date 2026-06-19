@@ -4,7 +4,7 @@ Pi extension for GPT service-tier controls and Codex-style `apply_patch` inside 
 
 ## What it adds
 
-- `/codex` interactive TUI config
+- `/lovely-codex` interactive TUI config
 - GPT service-tier modes for OpenAI GPT models
 - Codex priority cost adjustment for `openai-codex`
 - file-editing tool control: add `apply_patch`, optionally disable `edit` + `write`
@@ -21,7 +21,7 @@ Use without install:
 pi -e npm:@xl0/pi-lovely-codex
 ```
 
-## `/codex`
+## `/lovely-codex`
 
 Opens tabbed `User` and `Workspace` config.
 
@@ -74,5 +74,5 @@ All keys optional.
 ## Notes
 
 - Bad config on session load -> extension falls back to defaults and shows error.
-- Bad config in one `/codex` scope -> that scope ignored, warning shown.
+- Bad config in one `/lovely-codex` scope -> that scope ignored, warning shown.
 - Current `apply_patch` implementation shells out to `codex --codex-run-as-apply-patch`.

@@ -1,0 +1,463 @@
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { join, resolve } from "node:path"
+import { CONFIG_DIR_NAME, type ExtensionContext, getAgentDir, type Theme } from "@earendil-works/pi-coding-agent"
+import { Key, matchesKey, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui"
+import { type TObject, type TSchema, Type } from "typebox"
+import Schema from "typebox/schema"
+
+export type ConfigScope = "global" | "project"
+export type ScopedConfig<Config extends object> = Record<ConfigScope, Config>
+
+type EnumValues = readonly [string, ...string[]]
+
+type VisibilityContext = {
+	get(key: string): unknown
+	getScoped(key: string, scope?: ConfigScope): unknown
+	scope: ConfigScope
+}
+
+type BaseField = {
+	key: string
+	label: string
+	kind: "enum" | "boolean"
+	visibleWhen?: (ctx: VisibilityContext) => boolean
+	children?: readonly ScopedConfigField[]
+}
+
+export type EnumConfigField = BaseField & {
+	kind: "enum"
+	values: EnumValues
+	default: string
+}
+
+export type BooleanConfigField = BaseField & {
+	kind: "boolean"
+	default: boolean
+}
+
+export type ScopedConfigField = EnumConfigField | BooleanConfigField
+
+type ConfigDefaults<Config extends object> = { [Key in keyof Config]-?: NonNullable<Config[Key]> } & Record<string, unknown>
+
+type FlatField = ScopedConfigField & { depth: number }
+type Row = { kind: "field"; field: FlatField } | { kind: "reset" }
+type RenderTui = { requestRender(): void }
+
+type ScopedConfigChangeHandler<Config extends object> = (effective: Config, scoped: ScopedConfig<Config>, ctx: ExtensionContext) => void
+
+type ScopedConfigIO<Config extends object> = {
+	getPath(scope: ConfigScope, cwd: string): string
+	readFile(path: string): Config
+	writeFile(path: string, config: Config): void
+	deleteFile(path: string): void
+	merge(scoped: ScopedConfig<Config>): Config
+	loadScoped(cwd: string): ScopedConfig<Config>
+	load(cwd: string): Config
+}
+
+export type ScopedConfigDefinition<Config extends object> = ScopedConfigIO<Config> & {
+	fileName: string
+	fields: readonly ScopedConfigField[]
+	schema: TSchema
+	defaults: ConfigDefaults<Config>
+	get<Key extends keyof Config>(config: Config, key: Key): NonNullable<Config[Key]>
+}
+
+const scopeTabs: Array<{ scope: ConfigScope; label: string }> = [
+	{ scope: "global", label: "User" },
+	{ scope: "project", label: "Workspace" }
+]
+
+export function createScopedConfigSchema(fields: readonly ScopedConfigField[]): TObject {
+	const properties: Record<string, TSchema> = {}
+	for (const field of flattenFields(fields)) {
+		if (properties[field.key]) continue
+		properties[field.key] = Type.Optional(createFieldSchema(field))
+	}
+	return Type.Object(properties)
+}
+
+export function defineScopedConfig<
+	Config extends object,
+	const Fields extends readonly ScopedConfigField[] = readonly ScopedConfigField[]
+>(options: {
+	fileName: string
+	fields: Fields
+}): ScopedConfigDefinition<Config> & {
+	fields: Fields
+	schema: TObject
+} {
+	const schema = createScopedConfigSchema(options.fields)
+	const defaults = defaultConfig(options.fields) as ConfigDefaults<Config>
+	const io = createScopedConfigIO<Config>({ fileName: options.fileName, schema })
+	function get<Key extends keyof Config>(config: Config, key: Key): NonNullable<Config[Key]> {
+		const value = getConfigValue(config, String(key))
+		return (value === undefined ? defaults[key] : value) as NonNullable<Config[Key]>
+	}
+
+	return { ...io, fileName: options.fileName, fields: options.fields, schema, defaults, get }
+}
+
+export function createScopedConfigIO<Config extends object>(options: { fileName: string; schema: TSchema }): ScopedConfigIO<Config> {
+	const validator = Schema.Compile(options.schema)
+
+	function getPath(scope: ConfigScope, cwd: string): string {
+		return scope === "global" ? join(getAgentDir(), options.fileName) : resolve(cwd, CONFIG_DIR_NAME, options.fileName)
+	}
+
+	function readFile(path: string): Config {
+		if (!existsSync(path)) return {} as Config
+		const raw = readFileSync(path, "utf-8")
+		try {
+			return validator.Parse(JSON.parse(raw)) as Config
+		} catch {
+			return {} as Config
+		}
+	}
+
+	function writeFile(path: string, config: Config): void {
+		mkdirSync(resolve(path, ".."), { recursive: true })
+		writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`, "utf-8")
+	}
+
+	function deleteFile(path: string): void {
+		rmSync(path, { force: true })
+	}
+
+	function merge(scoped: ScopedConfig<Config>): Config {
+		return { ...scoped.global, ...scoped.project }
+	}
+
+	function loadScoped(cwd: string): ScopedConfig<Config> {
+		return {
+			global: readFile(getPath("global", cwd)),
+			project: readFile(getPath("project", cwd))
+		}
+	}
+
+	function load(cwd: string): Config {
+		return merge(loadScoped(cwd))
+	}
+
+	return { getPath, readFile, writeFile, deleteFile, merge, loadScoped, load }
+}
+
+export function createScopedConfigEditor<Config extends object>(options: {
+	tui: RenderTui
+	theme: Theme
+	ctx: ExtensionContext
+	config: ScopedConfigDefinition<Config>
+	scoped: ScopedConfig<Config>
+	onChange: ScopedConfigChangeHandler<Config>
+	done: (result: undefined) => void
+}) {
+	return new ScopedConfigEditor(
+		options.tui,
+		options.theme,
+		options.ctx,
+		options.config,
+		options.onChange,
+		flattenFields(options.config.fields),
+		options.config.defaults,
+		options.scoped,
+		options.done
+	)
+}
+
+class ScopedConfigEditor<Config extends object> {
+	private configs: ScopedConfig<Config>
+	private currentTab = 0
+	private currentRow = 0
+
+	constructor(
+		private readonly tui: RenderTui,
+		private readonly theme: Theme,
+		private readonly ctx: ExtensionContext,
+		private readonly config: ScopedConfigDefinition<Config>,
+		private readonly onChange: ScopedConfigChangeHandler<Config>,
+		private readonly fields: readonly FlatField[],
+		private readonly defaults: ConfigDefaults<Config>,
+		initialConfigs: ScopedConfig<Config>,
+		private readonly done: (result: undefined) => void
+	) {
+		this.configs = initialConfigs
+	}
+
+	render(width: number): string[] {
+		const lines: string[] = []
+		const renderWidth = Math.max(1, width)
+		const scope = this.currentScope()
+		const rows = this.rows(scope)
+
+		lines.push(this.theme.fg("accent", "─".repeat(renderWidth)))
+		this.renderTabs(lines, renderWidth)
+		lines.push("")
+		this.renderScopeHeader(lines, renderWidth)
+		lines.push("")
+		this.renderRows(lines, renderWidth, scope, rows)
+		lines.push("")
+		addWrappedWithPrefix(
+			lines,
+			renderWidth,
+			" ",
+			this.theme.fg("dim", "Tab/←→ switch scope • ↑↓ select • Enter/Space change/reset • Esc close")
+		)
+		lines.push(this.theme.fg("accent", "─".repeat(renderWidth)))
+
+		return lines
+	}
+
+	invalidate() {}
+
+	handleInput(data: string): void {
+		if (matchesKey(data, Key.tab) || matchesKey(data, Key.right)) {
+			this.switchTab(1)
+			return
+		}
+		if (matchesKey(data, Key.shift("tab")) || matchesKey(data, Key.left)) {
+			this.switchTab(-1)
+			return
+		}
+		if (matchesKey(data, Key.down)) {
+			this.moveRow(1)
+			return
+		}
+		if (matchesKey(data, Key.up)) {
+			this.moveRow(-1)
+			return
+		}
+		if (matchesKey(data, Key.enter) || data === " ") {
+			this.activateRow()
+			return
+		}
+		if (matchesKey(data, Key.escape)) this.done(undefined)
+	}
+
+	private renderTabs(lines: string[], width: number): void {
+		const tabs = ["← "]
+		for (const [index, tab] of scopeTabs.entries()) {
+			const isUnset = this.scopeIsUnset(tab.scope)
+			const text = ` ${isUnset ? "□" : "■"} ${tab.label} `
+			const styled =
+				index === this.currentTab
+					? this.theme.bg("selectedBg", this.theme.fg("text", text))
+					: this.theme.fg(isUnset ? "muted" : "success", text)
+			tabs.push(`${styled} `)
+		}
+		tabs.push("→")
+		addWrappedWithPrefix(lines, width, " ", tabs.join(""))
+	}
+
+	private renderScopeHeader(lines: string[], width: number): void {
+		const tab = scopeTabs[this.currentTab]
+		if (!tab) return
+
+		const path = this.config.getPath(tab.scope, this.ctx.cwd)
+		addWrappedWithPrefix(
+			lines,
+			width,
+			" ",
+			`${this.theme.fg("accent", this.theme.bold(`${tab.label} config`))} ${this.theme.fg("dim", path)}`
+		)
+	}
+
+	private renderRows(lines: string[], width: number, scope: ConfigScope, rows: Row[]): void {
+		for (const [index, row] of rows.entries()) {
+			const selected = index === this.currentRow
+			if (row.kind === "reset") {
+				this.renderResetRow(lines, width, selected)
+				continue
+			}
+
+			const prefix = this.theme.fg(selected ? "accent" : "muted", `${selected ? "> " : "  "}${"  ".repeat(row.field.depth)}`)
+			const value = formatScopedValue(this.configs[scope], row.field)
+			const note = getScopeNote(scope, this.configs, row.field)
+			const renderedNote = note ? ` ${this.theme.fg("muted", `(${note})`)}` : ""
+			const valueStyle = value === "unset" ? "muted" : "accent"
+			addWrappedWithPrefix(
+				lines,
+				width,
+				prefix,
+				`${this.theme.fg("text", row.field.label)}  ${this.theme.fg(valueStyle, value)}${renderedNote}`
+			)
+		}
+	}
+
+	private renderResetRow(lines: string[], width: number, selected: boolean): void {
+		lines.push(this.theme.fg("dim", `  ${"─".repeat(Math.max(1, width - 2))}`))
+		const prefix = this.theme.fg(selected ? "accent" : "muted", selected ? "> " : "  ")
+		addWrappedWithPrefix(
+			lines,
+			width,
+			prefix,
+			`${this.theme.fg("text", "Reset to default")}  ${this.theme.fg("muted", "delete this scope config file")}`
+		)
+	}
+
+	private currentScope(): ConfigScope {
+		return scopeTabs[this.currentTab]?.scope ?? "global"
+	}
+
+	private resolvedConfig(scope: ConfigScope): Record<string, unknown> {
+		return { ...this.defaults, ...this.configs.global, ...(scope === "project" ? this.configs.project : {}) }
+	}
+
+	private rows(scope: ConfigScope = this.currentScope()): Row[] {
+		const effective = this.resolvedConfig(scope)
+		const fields = this.fields.filter(field => isFieldVisible(field, scope, this.configs, effective))
+		return [...fields.map(field => ({ kind: "field" as const, field })), { kind: "reset" }]
+	}
+
+	private scopeIsUnset(scope: ConfigScope): boolean {
+		return this.fields.every(field => getConfigValue(this.configs[scope], field.key) === undefined)
+	}
+
+	private refresh(): void {
+		this.currentRow = Math.min(this.currentRow, this.rows().length - 1)
+		this.tui.requestRender()
+	}
+
+	private switchTab(delta: number): void {
+		this.currentTab = (this.currentTab + delta + scopeTabs.length) % scopeTabs.length
+		this.refresh()
+	}
+
+	private moveRow(delta: number): void {
+		const rowCount = this.rows().length
+		this.currentRow = (this.currentRow + delta + rowCount) % rowCount
+		this.refresh()
+	}
+
+	private activateRow(): void {
+		const scope = this.currentScope()
+		const row = this.rows(scope)[this.currentRow]
+		if (!row) return
+		if (row.kind === "reset") this.reset(scope)
+		else this.save(scope, cycleField(this.configs[scope], row.field))
+	}
+
+	private save(scope: ConfigScope, config: Config): void {
+		this.configs = { ...this.configs, [scope]: config }
+		this.config.writeFile(this.config.getPath(scope, this.ctx.cwd), config)
+		this.onChange(this.config.merge(this.configs), this.configs, this.ctx)
+		this.refresh()
+	}
+
+	private reset(scope: ConfigScope): void {
+		this.configs = { ...this.configs, [scope]: {} as Config }
+		this.config.deleteFile(this.config.getPath(scope, this.ctx.cwd))
+		this.onChange(this.config.merge(this.configs), this.configs, this.ctx)
+		this.refresh()
+	}
+}
+
+function addWrappedWithPrefix(lines: string[], width: number, prefix: string, text: string): void {
+	const prefixWidth = visibleWidth(prefix)
+	if (prefixWidth >= width) {
+		lines.push(...wrapTextWithAnsi(prefix + text, width))
+		return
+	}
+
+	const wrapped = wrapTextWithAnsi(text, width - prefixWidth)
+	const continuationPrefix = " ".repeat(prefixWidth)
+	for (let i = 0; i < wrapped.length; i++) lines.push(`${i === 0 ? prefix : continuationPrefix}${wrapped[i]}`)
+}
+
+function createFieldSchema(field: ScopedConfigField): TSchema {
+	switch (field.kind) {
+		case "enum":
+			if (field.values.length === 0) throw new Error(`Enum field ${field.key} must have at least one value`)
+			return Type.Union(field.values.map(value => Type.Literal(value)) as unknown as [TSchema, ...TSchema[]], { default: field.default })
+		case "boolean":
+			return Type.Boolean({ default: field.default })
+	}
+}
+
+function flattenFields(fields: readonly ScopedConfigField[], depth = 0): FlatField[] {
+	const flattened: FlatField[] = []
+	for (const field of fields) {
+		flattened.push({ ...field, depth })
+		if (field.children) flattened.push(...flattenFields(field.children, depth + 1))
+	}
+	return flattened
+}
+
+function defaultConfig(fields: readonly ScopedConfigField[]): Record<string, unknown> {
+	const defaults: Record<string, unknown> = {}
+	for (const field of flattenFields(fields)) defaults[field.key] ??= field.default
+	return defaults
+}
+
+function isFieldVisible<Config extends object>(
+	field: FlatField,
+	scope: ConfigScope,
+	configs: ScopedConfig<Config>,
+	effective: Record<string, unknown>
+): boolean {
+	if (!field.visibleWhen) return true
+	return field.visibleWhen({
+		scope,
+		get: key => effective[key],
+		getScoped: (key, targetScope = scope) => getConfigValue(configs[targetScope], key)
+	})
+}
+
+function getConfigValue(config: object, key: string): unknown {
+	return (config as Record<string, unknown>)[key]
+}
+
+function setConfigValue<Config extends object>(config: Config, key: string, value: unknown): Config {
+	const next = { ...(config as Record<string, unknown>) }
+	if (value === undefined) delete next[key]
+	else next[key] = value
+	return next as Config
+}
+
+function cycleField<Config extends object>(config: Config, field: ScopedConfigField): Config {
+	const current = formatScopedValue(config, field)
+	const options = field.kind === "enum" ? ["unset", ...field.values] : ["unset", "on", "off"]
+	const next = nextOption(options, current)
+	const persisted = field.kind === "boolean" ? (next === "unset" ? undefined : next === "on") : next === "unset" ? undefined : next
+	return setConfigValue(config, field.key, persisted)
+}
+
+function nextOption<T extends string>(options: readonly T[], value: T): T {
+	const index = options.indexOf(value)
+	return options[(index + 1) % options.length] ?? options[0] ?? value
+}
+
+function formatScopedValue(config: object, field: ScopedConfigField): string {
+	const value = getConfigValue(config, field.key)
+	return formatFieldValue(field, value)
+}
+
+function formatFieldValue(field: ScopedConfigField, value: unknown): string {
+	if (value === undefined) return "unset"
+	if (field.kind === "boolean") return value ? "on" : "off"
+	return String(value)
+}
+
+function getScopeNote<Config extends object>(
+	scope: ConfigScope,
+	configs: ScopedConfig<Config>,
+	field: ScopedConfigField
+): string | undefined {
+	const userValue = getConfigValue(configs.global, field.key)
+	const workspaceValue = getConfigValue(configs.project, field.key)
+	const user = userValue === undefined ? undefined : formatFieldValue(field, userValue)
+	const workspace = workspaceValue === undefined ? undefined : formatFieldValue(field, workspaceValue)
+	const defaultValue = formatFieldValue(field, field.default)
+
+	if (user === undefined && workspace === undefined) return `uses default: ${defaultValue}`
+
+	if (scope === "global") {
+		if (user !== undefined && workspace !== undefined) return `Workspace overrides with: ${workspace}`
+		if (user === undefined && workspace !== undefined) return `Workspace sets: ${workspace}`
+		return undefined
+	}
+
+	if (workspace === undefined && user !== undefined) return `inherits User: ${user}`
+	if (workspace !== undefined && user !== undefined) return workspace === user ? `same as User: ${user}` : `overrides User: ${user}`
+	if (workspace !== undefined && user === undefined) return `overrides default: ${defaultValue}`
+	return undefined
+}
