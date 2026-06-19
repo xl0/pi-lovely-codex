@@ -22,6 +22,8 @@ export interface ApplyPatchToolDetails extends ApplyPatchCommandResult {
 	firstChangedLine?: number
 }
 
+const failureDetails = new Map<string, ApplyPatchToolDetails>()
+
 interface FileSnapshot {
 	path: string
 	exists: boolean
@@ -30,6 +32,17 @@ interface FileSnapshot {
 
 export function buildApplyPatchOutput(stdout: string, stderr: string): string {
 	return `${stdout}${stderr}`
+}
+
+function readTextContent(result: { content: Array<{ type: string; text?: string }> }): string {
+	return result.content
+		.map(block => (block.type === "text" ? block.text : undefined))
+		.filter((text): text is string => Boolean(text))
+		.join("\n")
+}
+
+function trimTrailingNewline(text: string): string {
+	return text.endsWith("\n") ? text.slice(0, -1) : text
 }
 
 function parseTouchedPaths(input: string): string[] {
@@ -126,7 +139,7 @@ export async function runCodexApplyPatch(cwd: string, input: string): Promise<Ap
 	})
 }
 
-const applyPatchTool = defineTool({
+export const applyPatchTool = defineTool({
 	name: "apply_patch",
 	label: "apply_patch",
 	description:
@@ -147,16 +160,18 @@ const applyPatchTool = defineTool({
 		const suffix = paths ? ` ${theme.fg("accent", paths)}` : ""
 		return new Text(`${theme.fg("toolTitle", theme.bold("apply_patch"))}${suffix}`, 0, 0)
 	},
-	async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 		const touchedPaths = parseTouchedPaths(params.input)
 		const before = touchedPaths.map(path => readSnapshot(ctx.cwd, path))
 		const result = await runCodexApplyPatch(ctx.cwd, params.input)
 		const after = touchedPaths.map(path => readSnapshot(ctx.cwd, path))
 		const diffDetails = buildDiff(before, after)
 		if (result.exitCode !== 0) {
+			failureDetails.set(toolCallId, { ...result, ...diffDetails })
 			const diffOutput = diffDetails.diff ? `\n\nPartial changes:\n${diffDetails.diff}` : ""
 			throw new Error((result.output || `apply_patch failed with exit code ${result.exitCode}`) + diffOutput)
 		}
+		failureDetails.delete(toolCallId)
 		return {
 			content: [{ type: "text", text: result.output }],
 			details: {
@@ -171,7 +186,29 @@ const applyPatchTool = defineTool({
 	renderResult(result, _options, _theme, context) {
 		const component = new Container()
 		component.clear()
-		if (context.isError) return component
+		if (context.isError) {
+			const details = result.details as ApplyPatchToolDetails | undefined
+			if (details?.exitCode !== undefined) {
+				component.addChild(new Spacer(1))
+				component.addChild(new Text(`apply_patch failed (exit ${details.exitCode})`, 1, 0))
+				if (details.stdout) component.addChild(new Text(`stdout:\n${trimTrailingNewline(details.stdout)}`, 1, 0))
+				if (details.stderr) component.addChild(new Text(`stderr:\n${trimTrailingNewline(details.stderr)}`, 1, 0))
+				if (!details.stdout && !details.stderr && details.output) {
+					component.addChild(new Text(trimTrailingNewline(details.output), 1, 0))
+				}
+				if (details.diff) {
+					component.addChild(new Text("Partial changes:", 1, 0))
+					component.addChild(new Text(renderDiff(details.diff), 1, 0))
+				}
+				return component
+			}
+
+			const output = readTextContent(result)
+			if (!output) return component
+			component.addChild(new Spacer(1))
+			component.addChild(new Text(output, 1, 0))
+			return component
+		}
 
 		const details = result.details as ApplyPatchToolDetails | undefined
 		if (!details?.diff) return component
@@ -184,4 +221,11 @@ const applyPatchTool = defineTool({
 
 export function registerApplyPatchTool(pi: ExtensionAPI) {
 	pi.registerTool(applyPatchTool)
+	pi.on("tool_result", event => {
+		if (event.toolName !== "apply_patch") return undefined
+		const details = failureDetails.get(event.toolCallId)
+		if (!details) return undefined
+		failureDetails.delete(event.toolCallId)
+		return { details }
+	})
 }

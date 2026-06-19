@@ -238,6 +238,10 @@ TUI behavior:
 
 - call line highlights touched filenames like `edit`
 - result renders line-numbered diffs through Pi `renderDiff`
+- failures keep thrown error text as LLM tool-result content, while a `tool_result`
+  hook attaches captured command details for UI rendering
+- failure UI renders `apply_patch failed (exit N)`, labelled stdout/stderr,
+  and line-numbered partial-change diffs when available
 - filename headers are prefixed only for multi-file diffs
 
 Current impl delegates semantics to Codex CLI instead of native patch parser.
@@ -253,6 +257,7 @@ Apply-patch tests live under `tests/apply-patch/`.
 - `scenario.test.ts`: runs copied upstream Codex scenarios against each runner;
   compares final filesystem state.
 - `cli.test.ts`: explicit stdout/stderr/exit-code behavior cases.
+- `tool.test.ts`: custom tool render/error propagation checks.
 - `fixtures/scenarios/`: copied Codex fixture corpus with
   `input/`, `expected/`, `patch.txt` layout.
 
