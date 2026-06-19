@@ -53,13 +53,13 @@ Defaults after scope merge, exposed as `codexConfig.defaults`:
 
 Scopes:
 
-- global: `${getAgentDir()}/xl0-pi-lovely-codex.json` (default `~/.pi/agent/...`)
-- project: `<cwd>/${CONFIG_DIR_NAME}/xl0-pi-lovely-codex.json` (default `<cwd>/.pi/...`)
+- user: `${getAgentDir()}/xl0-pi-lovely-codex.json` (default `~/.pi/agent/...`)
+- workspace: `<cwd>/${CONFIG_DIR_NAME}/xl0-pi-lovely-codex.json` (default `<cwd>/.pi/...`)
 
-Project overrides global through shallow merge:
+Workspace overrides user through shallow merge:
 
 ```ts
-{ ...global, ...project }
+{ ...user, ...workspace }
 ```
 
 Config IO is sync and TypeBox-validated through the internal scoped-config helper.
@@ -145,7 +145,7 @@ Command takes no args and opens a TUI config editor.
 
 UI:
 
-- tabbed scopes: `User` = global, `Workspace` = project
+- tabbed scopes: `User` and `Workspace`
 - rows:
   - `GPT mode`: `unset`, `default`, `fast`, `fast-codex`
   - `add apply_patch`: `unset`, `on`, `off`, `gpt-only`
