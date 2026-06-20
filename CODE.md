@@ -188,10 +188,11 @@ Prompt describes Codex apply-patch format:
 Execution:
 
 1. parse touched paths from patch envelope
-2. snapshot touched files before run when possible
-3. spawn `codex --codex-run-as-apply-patch <input>` in `ctx.cwd`
-4. snapshot touched files after run when possible
-5. build edit-like result metadata and rendered diff
+2. acquire Pi file mutation queues for touched files in sorted absolute-path order
+3. snapshot touched files before run when possible
+4. spawn `codex --codex-run-as-apply-patch <input>` in `ctx.cwd`
+5. snapshot touched files after run when possible
+6. build edit-like result metadata and rendered diff
 
 Success returns combined `stdout + stderr` as tool text.
 
@@ -214,6 +215,10 @@ TUI behavior:
 
 - call line highlights touched filenames like `edit`
 - result renders line-numbered diffs through Pi `renderDiff`
+- failures keep thrown error text as LLM tool-result content, while a `tool_result`
+  hook attaches captured command details for UI rendering
+- failure UI renders raw combined output, then line-numbered partial-change
+  diffs when available
 - filename headers are prefixed only for multi-file diffs
 
 Current impl delegates semantics to Codex CLI instead of native patch parser.
@@ -229,6 +234,7 @@ Apply-patch tests live under `tests/apply-patch/`.
 - `scenario.test.ts`: runs copied upstream Codex scenarios against each runner;
   compares final filesystem state.
 - `cli.test.ts`: explicit stdout/stderr/exit-code behavior cases.
+- `tool.test.ts`: custom tool render/error propagation checks.
 - `fixtures/scenarios/`: copied Codex fixture corpus with
   `input/`, `expected/`, `patch.txt` layout.
 
