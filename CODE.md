@@ -27,7 +27,7 @@ State below describes current codebase, not history.
 ## Config model
 
 Implemented in `extensions/lovely-codex/config.ts` as `codexConfigFields` plus
-`codexConfigSpec = defineScopedConfig(...)`.
+`codexConfigSpec = defineScopedConfigSpec(...)`.
 `CodexConfig` is derived from the field descriptors with `ConfigFromFields`.
 Field descriptors drive runtime schema/defaults/UI and static config typing.
 
@@ -72,7 +72,7 @@ Implemented in `extensions/lovely-codex/index.ts`.
 
 Entrypoint `lovelyCodexExtension(pi)` owns process-local state:
 
-- `effectiveConfig`: effective merged config
+- `config`: `ScopedConfigState<CodexConfig>` holding effective merged config
 - `editToolBaseline`: active tool set captured at session start
 - `selectedModelIsGpt`: current model GPT-ness for `gpt-only` apply-patch mode
 
@@ -122,20 +122,20 @@ Implemented in `extensions/lovely-codex/scoped-config.ts`.
 
 Internal helper exports:
 
-- `defineScopedConfig({ fileName, fields })`: builds schema-backed defaults, typed `get()`, and scoped IO
+- `defineScopedConfigSpec({ fileName, fields })`: validates field descriptors and builds schema-backed defaults, typed `get()`, and scoped IO
+- `ScopedConfigState<Config>`: wraps a config spec with extension-local effective config state
 - `ConfigFromFields<Fields>`: derives optional config object type from enum/boolean field descriptors, including children
 - `createScopedConfigSchema(fields)`: derives flat runtime TypeBox schema from field descriptors
-- `createScopedConfigEditor({ config, ... })`: creates reusable User/Workspace TUI config editor UI
-- TUI config editor state/render/input lives in `ScopedConfigEditor` component.
+- `ScopedConfigEditor`: reusable User/Workspace TUI config editor component.
 
 Supported field kinds: `enum`, `boolean`.
 Persisted keys are flat; `children` only controls UI nesting.
-Defaults originate on fields, are written into generated schema, are exposed through config definitions, and are used for typed `get()`, UI notes, and visibility; defaults are not persisted.
+Defaults originate on fields, are written into generated schema, are exposed through config specs, and are used for typed `get()`, UI notes, and visibility; defaults are not persisted.
 `visibleWhen` reads default-filled effective config through `get()` and can read scoped values through `getScoped()`.
 Hidden fields stay persisted/effective.
 Writes are immediate per field cycle; unset deletes only that key.
 Reset deletes the active scope file.
-Caller owns runtime side effects through `onChange(effective, scoped, ctx)`.
+Caller owns runtime side effects through `onChange(effective, scoped)`.
 
 ## `/lovely-codex` command
 

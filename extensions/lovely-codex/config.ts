@@ -1,4 +1,10 @@
-import { type ConfigFromFields, type ConfigScope, defineScopedConfig, type ScopedConfig, type ScopedConfigField } from "./scoped-config.js"
+import {
+	type ConfigFromFields,
+	type ConfigScope,
+	defineScopedConfigSpec,
+	type ScopedConfig,
+	type ScopedConfigField
+} from "./scoped-config.js"
 
 export const CONFIG_FILE_NAME = "xl0-pi-lovely-codex.json"
 
@@ -37,7 +43,7 @@ const codexConfigFields = [
 
 export type CodexConfig = ConfigFromFields<typeof codexConfigFields>
 
-export const codexConfigSpec = defineScopedConfig({
+export const codexConfigSpec = defineScopedConfigSpec({
 	fileName: CONFIG_FILE_NAME,
 	fields: codexConfigFields
 })

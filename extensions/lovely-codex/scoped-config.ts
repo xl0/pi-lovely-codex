@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { CONFIG_DIR_NAME, type ExtensionContext, getAgentDir, type Theme } from "@earendil-works/pi-coding-agent"
 import { Key, matchesKey, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui"
 import { type TObject, type TSchema, Type } from "typebox"
@@ -53,16 +53,16 @@ type FlatField = ScopedConfigField & { depth: number }
 type Row = { kind: "field"; field: FlatField } | { kind: "reset" }
 type RenderTui = { requestRender(): void }
 
-type ScopedConfigChangeHandler<Config extends object> = (effective: Config, scoped: ScopedConfig<Config>, ctx: ExtensionContext) => void
+type ScopedConfigChangeHandler<Config extends object> = (effective: Config, scoped: ScopedConfig<Config>) => void
 
-export type ScopedConfigDefinition<Config extends object> = {
+export type ScopedConfigSpec<Config extends object> = {
 	fileName: string
 	fields: readonly ScopedConfigField[]
 	schema: TSchema
 	defaults: ConfigDefaults<Config>
 	get<Key extends keyof Config>(config: Config, key: Key): NonNullable<Config[Key]>
 	getPath(scope: ConfigScope, cwd: string): string
-	readFile(path: string): Config
+	readFileOrEmpty(path: string): Config
 	writeFile(path: string, config: Config): void
 	deleteFile(path: string): void
 	merge(scoped: ScopedConfig<Config>): Config
@@ -70,21 +70,46 @@ export type ScopedConfigDefinition<Config extends object> = {
 	load(cwd: string): Config
 }
 
-const scopeTabs: ConfigScope[] = ["user", "workspace"]
+export class ScopedConfigState<Config extends object> {
+	private effective: Config = {} as Config
+
+	constructor(readonly spec: ScopedConfigSpec<Config>) {}
+
+	load(cwd: string): Config {
+		this.effective = this.spec.load(cwd)
+		return this.effective
+	}
+
+	set(next: Config): Config {
+		this.effective = next
+		return this.effective
+	}
+
+	reset(): Config {
+		this.effective = {} as Config
+		return this.effective
+	}
+
+	get<Key extends keyof Config>(key: Key): NonNullable<Config[Key]> {
+		return this.spec.get(this.effective, key)
+	}
+}
+
+const scopeTabs = ["user", "workspace"] as const satisfies readonly ConfigScope[]
 
 export function createScopedConfigSchema(fields: readonly ScopedConfigField[]): TObject {
+	validateFields(fields)
 	const properties: Record<string, TSchema> = {}
 	for (const field of flattenFields(fields)) {
-		if (properties[field.key]) continue
 		properties[field.key] = Type.Optional(createFieldSchema(field))
 	}
 	return Type.Object(properties)
 }
 
-export function defineScopedConfig<const Fields extends readonly ScopedConfigField[]>(options: {
+export function defineScopedConfigSpec<const Fields extends readonly ScopedConfigField[]>(options: {
 	fileName: string
 	fields: Fields
-}): ScopedConfigDefinition<ConfigFromFields<Fields>> & {
+}): ScopedConfigSpec<ConfigFromFields<Fields>> & {
 	fields: Fields
 	schema: TObject
 } {
@@ -102,7 +127,7 @@ export function defineScopedConfig<const Fields extends readonly ScopedConfigFie
 		return scope === "user" ? join(getAgentDir(), options.fileName) : resolve(cwd, CONFIG_DIR_NAME, options.fileName)
 	}
 
-	function readFile(path: string): Config {
+	function readFileOrEmpty(path: string): Config {
 		if (!existsSync(path)) return {} as Config
 		const raw = readFileSync(path, "utf-8")
 		try {
@@ -113,7 +138,7 @@ export function defineScopedConfig<const Fields extends readonly ScopedConfigFie
 	}
 
 	function writeFile(path: string, config: Config): void {
-		mkdirSync(resolve(path, ".."), { recursive: true })
+		mkdirSync(dirname(path), { recursive: true })
 		writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`, "utf-8")
 	}
 
@@ -127,8 +152,8 @@ export function defineScopedConfig<const Fields extends readonly ScopedConfigFie
 
 	function loadScoped(cwd: string): ScopedConfig<Config> {
 		return {
-			user: readFile(getPath("user", cwd)),
-			workspace: readFile(getPath("workspace", cwd))
+			user: readFileOrEmpty(getPath("user", cwd)),
+			workspace: readFileOrEmpty(getPath("workspace", cwd))
 		}
 	}
 
@@ -143,7 +168,7 @@ export function defineScopedConfig<const Fields extends readonly ScopedConfigFie
 		defaults,
 		get,
 		getPath,
-		readFile,
+		readFileOrEmpty,
 		writeFile,
 		deleteFile,
 		merge,
@@ -152,45 +177,37 @@ export function defineScopedConfig<const Fields extends readonly ScopedConfigFie
 	}
 }
 
-export function createScopedConfigEditor<Config extends object>(options: {
-	tui: RenderTui
-	theme: Theme
-	ctx: ExtensionContext
-	config: ScopedConfigDefinition<Config>
-	scoped: ScopedConfig<Config>
-	onChange: ScopedConfigChangeHandler<Config>
-	done: (result: undefined) => void
-}) {
-	return new ScopedConfigEditor(
-		options.tui,
-		options.theme,
-		options.ctx,
-		options.config,
-		options.onChange,
-		flattenFields(options.config.fields),
-		options.config.defaults,
-		options.scoped,
-		options.done
-	)
-}
-
-class ScopedConfigEditor<Config extends object> {
-	private configs: ScopedConfig<Config>
+export class ScopedConfigEditor<Config extends object> {
+	private scoped: ScopedConfig<Config>
+	private readonly tui: RenderTui
+	private readonly theme: Theme
+	private readonly ctx: ExtensionContext
+	private readonly spec: ScopedConfigSpec<Config>
+	private readonly onChange: ScopedConfigChangeHandler<Config>
+	private readonly fields: readonly FlatField[]
+	private readonly defaults: ConfigDefaults<Config>
+	private readonly done: (result: undefined) => void
 	private currentTab = 0
 	private currentRow = 0
 
-	constructor(
-		private readonly tui: RenderTui,
-		private readonly theme: Theme,
-		private readonly ctx: ExtensionContext,
-		private readonly config: ScopedConfigDefinition<Config>,
-		private readonly onChange: ScopedConfigChangeHandler<Config>,
-		private readonly fields: readonly FlatField[],
-		private readonly defaults: ConfigDefaults<Config>,
-		initialConfigs: ScopedConfig<Config>,
-		private readonly done: (result: undefined) => void
-	) {
-		this.configs = initialConfigs
+	constructor(options: {
+		tui: RenderTui
+		theme: Theme
+		ctx: ExtensionContext
+		spec: ScopedConfigSpec<Config>
+		scoped: ScopedConfig<Config>
+		onChange: ScopedConfigChangeHandler<Config>
+		done: (result: undefined) => void
+	}) {
+		this.tui = options.tui
+		this.theme = options.theme
+		this.ctx = options.ctx
+		this.spec = options.spec
+		this.onChange = options.onChange
+		this.fields = flattenFields(options.spec.fields)
+		this.defaults = options.spec.defaults
+		this.scoped = options.scoped
+		this.done = options.done
 	}
 
 	render(width: number): string[] {
@@ -262,7 +279,7 @@ class ScopedConfigEditor<Config extends object> {
 		const scope = scopeTabs[this.currentTab]
 		if (!scope) return
 
-		const path = this.config.getPath(scope, this.ctx.cwd)
+		const path = this.spec.getPath(scope, this.ctx.cwd)
 		addWrappedWithPrefix(
 			lines,
 			width,
@@ -280,8 +297,8 @@ class ScopedConfigEditor<Config extends object> {
 			}
 
 			const prefix = this.theme.fg(selected ? "accent" : "muted", `${selected ? "> " : "  "}${"  ".repeat(row.field.depth)}`)
-			const value = formatScopedValue(this.configs[scope], row.field)
-			const note = getScopeNote(scope, this.configs, row.field)
+			const value = formatScopedValue(this.scoped[scope], row.field)
+			const note = getScopeNote(scope, this.scoped, row.field)
 			const renderedNote = note ? ` ${this.theme.fg("muted", `(${note})`)}` : ""
 			const valueStyle = value === "unset" ? "muted" : "accent"
 			addWrappedWithPrefix(
@@ -309,17 +326,17 @@ class ScopedConfigEditor<Config extends object> {
 	}
 
 	private resolvedConfig(scope: ConfigScope): Record<string, unknown> {
-		return { ...this.defaults, ...this.configs.user, ...(scope === "workspace" ? this.configs.workspace : {}) }
+		return { ...this.defaults, ...this.scoped.user, ...(scope === "workspace" ? this.scoped.workspace : {}) }
 	}
 
 	private rows(scope: ConfigScope = this.currentScope()): Row[] {
 		const effective = this.resolvedConfig(scope)
-		const fields = this.fields.filter(field => isFieldVisible(field, scope, this.configs, effective))
+		const fields = this.fields.filter(field => isFieldVisible(field, scope, this.scoped, effective))
 		return [...fields.map(field => ({ kind: "field" as const, field })), { kind: "reset" }]
 	}
 
 	private scopeIsUnset(scope: ConfigScope): boolean {
-		return this.fields.every(field => getConfigValue(this.configs[scope], field.key) === undefined)
+		return this.fields.every(field => getConfigValue(this.scoped[scope], field.key) === undefined)
 	}
 
 	private refresh(): void {
@@ -343,20 +360,20 @@ class ScopedConfigEditor<Config extends object> {
 		const row = this.rows(scope)[this.currentRow]
 		if (!row) return
 		if (row.kind === "reset") this.reset(scope)
-		else this.save(scope, cycleField(this.configs[scope], row.field))
+		else this.save(scope, cycleField(this.scoped[scope], row.field))
 	}
 
-	private save(scope: ConfigScope, config: Config): void {
-		this.configs = { ...this.configs, [scope]: config }
-		this.config.writeFile(this.config.getPath(scope, this.ctx.cwd), config)
-		this.onChange(this.config.merge(this.configs), this.configs, this.ctx)
+	private save(scope: ConfigScope, nextConfig: Config): void {
+		this.scoped = { ...this.scoped, [scope]: nextConfig }
+		this.spec.writeFile(this.spec.getPath(scope, this.ctx.cwd), nextConfig)
+		this.onChange(this.spec.merge(this.scoped), this.scoped)
 		this.refresh()
 	}
 
 	private reset(scope: ConfigScope): void {
-		this.configs = { ...this.configs, [scope]: {} as Config }
-		this.config.deleteFile(this.config.getPath(scope, this.ctx.cwd))
-		this.onChange(this.config.merge(this.configs), this.configs, this.ctx)
+		this.scoped = { ...this.scoped, [scope]: {} as Config }
+		this.spec.deleteFile(this.spec.getPath(scope, this.ctx.cwd))
+		this.onChange(this.spec.merge(this.scoped), this.scoped)
 		this.refresh()
 	}
 }
@@ -371,6 +388,20 @@ function addWrappedWithPrefix(lines: string[], width: number, prefix: string, te
 	const wrapped = wrapTextWithAnsi(text, width - prefixWidth)
 	const continuationPrefix = " ".repeat(prefixWidth)
 	for (let i = 0; i < wrapped.length; i++) lines.push(`${i === 0 ? prefix : continuationPrefix}${wrapped[i]}`)
+}
+
+function validateFields(fields: readonly ScopedConfigField[]): void {
+	const keys = new Set<string>()
+	for (const field of flattenFields(fields)) {
+		if (keys.has(field.key)) throw new Error(`Duplicate config field key: ${field.key}`)
+		keys.add(field.key)
+
+		if (field.kind !== "enum") continue
+		if (field.values.length === 0) throw new Error(`Enum field ${field.key} must have at least one value`)
+		if (!field.values.includes(field.default)) {
+			throw new Error(`Enum field ${field.key} default must be one of: ${field.values.join(", ")}`)
+		}
+	}
 }
 
 function createFieldSchema(field: ScopedConfigField): TSchema {
