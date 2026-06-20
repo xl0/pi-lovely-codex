@@ -36,8 +36,18 @@ export type BooleanConfigField = BaseField & {
 }
 
 export type ScopedConfigField = EnumConfigField | BooleanConfigField
+export type ConfigFromFields<Fields extends readonly ScopedConfigField[]> = {
+	[Field in FieldUnion<Fields> as Field["key"]]?: FieldValue<Field>
+}
 
 type ConfigDefaults<Config extends object> = { [Key in keyof Config]-?: NonNullable<Config[Key]> } & Record<string, unknown>
+type FieldUnion<Fields extends readonly ScopedConfigField[]> = Fields[number] | ChildFieldUnion<Fields[number]>
+type ChildFieldUnion<Field> = Field extends { children: infer Children extends readonly ScopedConfigField[] } ? FieldUnion<Children> : never
+type FieldValue<Field> = Field extends { kind: "enum"; values: infer Values extends readonly string[] }
+	? Values[number]
+	: Field extends { kind: "boolean" }
+		? boolean
+		: never
 
 type FlatField = ScopedConfigField & { depth: number }
 type Row = { kind: "field"; field: FlatField } | { kind: "reset" }
@@ -45,7 +55,12 @@ type RenderTui = { requestRender(): void }
 
 type ScopedConfigChangeHandler<Config extends object> = (effective: Config, scoped: ScopedConfig<Config>, ctx: ExtensionContext) => void
 
-type ScopedConfigIO<Config extends object> = {
+export type ScopedConfigDefinition<Config extends object> = {
+	fileName: string
+	fields: readonly ScopedConfigField[]
+	schema: TSchema
+	defaults: ConfigDefaults<Config>
+	get<Key extends keyof Config>(config: Config, key: Key): NonNullable<Config[Key]>
 	getPath(scope: ConfigScope, cwd: string): string
 	readFile(path: string): Config
 	writeFile(path: string, config: Config): void
@@ -53,14 +68,6 @@ type ScopedConfigIO<Config extends object> = {
 	merge(scoped: ScopedConfig<Config>): Config
 	loadScoped(cwd: string): ScopedConfig<Config>
 	load(cwd: string): Config
-}
-
-export type ScopedConfigDefinition<Config extends object> = ScopedConfigIO<Config> & {
-	fileName: string
-	fields: readonly ScopedConfigField[]
-	schema: TSchema
-	defaults: ConfigDefaults<Config>
-	get<Key extends keyof Config>(config: Config, key: Key): NonNullable<Config[Key]>
 }
 
 const scopeTabs: ConfigScope[] = ["user", "workspace"]
@@ -74,29 +81,22 @@ export function createScopedConfigSchema(fields: readonly ScopedConfigField[]): 
 	return Type.Object(properties)
 }
 
-export function defineScopedConfig<
-	Config extends object,
-	const Fields extends readonly ScopedConfigField[] = readonly ScopedConfigField[]
->(options: {
+export function defineScopedConfig<const Fields extends readonly ScopedConfigField[]>(options: {
 	fileName: string
 	fields: Fields
-}): ScopedConfigDefinition<Config> & {
+}): ScopedConfigDefinition<ConfigFromFields<Fields>> & {
 	fields: Fields
 	schema: TObject
 } {
+	type Config = ConfigFromFields<Fields>
 	const schema = createScopedConfigSchema(options.fields)
 	const defaults = defaultConfig(options.fields) as ConfigDefaults<Config>
-	const io = createScopedConfigIO<Config>({ fileName: options.fileName, schema })
+	const validator = Schema.Compile(schema)
+
 	function get<Key extends keyof Config>(config: Config, key: Key): NonNullable<Config[Key]> {
 		const value = getConfigValue(config, String(key))
 		return (value === undefined ? defaults[key] : value) as NonNullable<Config[Key]>
 	}
-
-	return { ...io, fileName: options.fileName, fields: options.fields, schema, defaults, get }
-}
-
-export function createScopedConfigIO<Config extends object>(options: { fileName: string; schema: TSchema }): ScopedConfigIO<Config> {
-	const validator = Schema.Compile(options.schema)
 
 	function getPath(scope: ConfigScope, cwd: string): string {
 		return scope === "user" ? join(getAgentDir(), options.fileName) : resolve(cwd, CONFIG_DIR_NAME, options.fileName)
@@ -136,7 +136,20 @@ export function createScopedConfigIO<Config extends object>(options: { fileName:
 		return merge(loadScoped(cwd))
 	}
 
-	return { getPath, readFile, writeFile, deleteFile, merge, loadScoped, load }
+	return {
+		fileName: options.fileName,
+		fields: options.fields,
+		schema,
+		defaults,
+		get,
+		getPath,
+		readFile,
+		writeFile,
+		deleteFile,
+		merge,
+		loadScoped,
+		load
+	}
 }
 
 export function createScopedConfigEditor<Config extends object>(options: {

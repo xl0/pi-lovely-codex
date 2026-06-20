@@ -26,10 +26,10 @@ State below describes current codebase, not history.
 
 ## Config model
 
-Implemented in `extensions/lovely-codex/config.ts` as explicit `CodexConfig` plus
-`codexConfig = defineScopedConfig<CodexConfig>(...)`.
-Field descriptors drive runtime schema/defaults/UI, and the explicit config type
-keeps TS access simple.
+Implemented in `extensions/lovely-codex/config.ts` as `codexConfigFields` plus
+`codexConfigSpec = defineScopedConfig(...)`.
+`CodexConfig` is derived from the field descriptors with `ConfigFromFields`.
+Field descriptors drive runtime schema/defaults/UI and static config typing.
 
 Config schema:
 
@@ -44,7 +44,7 @@ Config schema:
 
 All fields are optional. Omitted means unset in that scope.
 
-Defaults after scope merge, exposed as `codexConfig.defaults`:
+Defaults after scope merge, exposed as `codexConfigSpec.defaults`:
 
 - `gptMode`: `default`
 - `applyPatchAddMode`: `gpt-only`
@@ -72,7 +72,7 @@ Implemented in `extensions/lovely-codex/index.ts`.
 
 Entrypoint `lovelyCodexExtension(pi)` owns process-local state:
 
-- `config`: effective merged config
+- `effectiveConfig`: effective merged config
 - `editToolBaseline`: active tool set captured at session start
 - `selectedModelIsGpt`: current model GPT-ness for `gpt-only` apply-patch mode
 
@@ -122,9 +122,9 @@ Implemented in `extensions/lovely-codex/scoped-config.ts`.
 
 Internal helper exports:
 
-- `defineScopedConfig<Config>({ fileName, fields })`: builds schema-backed defaults, typed `get()`, and scoped IO
+- `defineScopedConfig({ fileName, fields })`: builds schema-backed defaults, typed `get()`, and scoped IO
+- `ConfigFromFields<Fields>`: derives optional config object type from enum/boolean field descriptors, including children
 - `createScopedConfigSchema(fields)`: derives flat runtime TypeBox schema from field descriptors
-- `createScopedConfigIO({ fileName, schema })`: sync scoped config paths, load, write, delete, shallow merge
 - `createScopedConfigEditor({ config, ... })`: creates reusable User/Workspace TUI config editor UI
 - TUI config editor state/render/input lives in `ScopedConfigEditor` component.
 
