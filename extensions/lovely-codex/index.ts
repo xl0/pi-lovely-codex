@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
 import { registerApplyPatchTool } from "./apply-patch.js"
-import { type CodexConfig, codexConfig, type ScopedCodexConfig } from "./config.js"
+import { type CodexConfig, codexConfigSpec, type ScopedCodexConfig } from "./config.js"
 import { registerGptModeHooks } from "./gpt-mode.js"
 import { createScopedConfigEditor } from "./scoped-config.js"
 
@@ -9,22 +9,22 @@ function isGptModel(model: ExtensionContext["model"]): boolean {
 }
 
 export default function lovelyCodexExtension(pi: ExtensionAPI) {
-	let config: CodexConfig = {}
+	let effectiveConfig: CodexConfig = {}
 	let editToolBaseline = new Set<string>()
 	let selectedModelIsGpt = false
-	const getMode = () => codexConfig.get(config, "gptMode")
+	const getMode = () => codexConfigSpec.get(effectiveConfig, "gptMode")
 	const applyToolConfig = () => {
-		const addMode = codexConfig.get(config, "applyPatchAddMode")
+		const addMode = codexConfigSpec.get(effectiveConfig, "applyPatchAddMode")
 		const hasApplyPatch = addMode === "on" || (addMode === "gpt-only" && selectedModelIsGpt)
 		const active = new Set(pi.getActiveTools())
 
 		if (hasApplyPatch) active.add("apply_patch")
 		else active.delete("apply_patch")
 
-		if (hasApplyPatch && codexConfig.get(config, "disableWrite")) active.delete("write")
+		if (hasApplyPatch && codexConfigSpec.get(effectiveConfig, "disableWrite")) active.delete("write")
 		else if (editToolBaseline.has("write")) active.add("write")
 
-		if (hasApplyPatch && codexConfig.get(config, "disableEdit")) active.delete("edit")
+		if (hasApplyPatch && codexConfigSpec.get(effectiveConfig, "disableEdit")) active.delete("edit")
 		else if (editToolBaseline.has("edit")) active.add("edit")
 
 		pi.setActiveTools(Array.from(active))
@@ -34,10 +34,10 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 		ctx.ui.setStatus("lovely-codex", mode === "default" ? undefined : ctx.ui.theme.fg("accent", "🏎️"))
 	}
 	const refreshConfig = (cwd: string) => {
-		config = codexConfig.load(cwd)
+		effectiveConfig = codexConfigSpec.load(cwd)
 	}
 	const setConfig = (nextConfig: CodexConfig, ctx: ExtensionContext) => {
-		config = nextConfig
+		effectiveConfig = nextConfig
 		applyToolConfig()
 		updateStatus(ctx)
 	}
@@ -50,10 +50,10 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 			applyToolConfig()
 			updateStatus(ctx)
 		} catch (error) {
-			config = {}
+			effectiveConfig = {}
 			applyToolConfig()
 			ctx.ui.setStatus("lovely-codex", undefined)
-			ctx.ui.notify(`${codexConfig.fileName} config error: ${error instanceof Error ? error.message : String(error)}`, "error")
+			ctx.ui.notify(`${codexConfigSpec.fileName} config error: ${error instanceof Error ? error.message : String(error)}`, "error")
 		}
 	})
 
@@ -77,7 +77,7 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 					tui,
 					theme,
 					ctx,
-					config: codexConfig,
+					config: codexConfigSpec,
 					scoped,
 					onChange(effective) {
 						setConfig(effective, ctx)
@@ -94,13 +94,13 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 function loadCommandConfig(ctx: ExtensionContext): ScopedCodexConfig {
 	const config: ScopedCodexConfig = { user: {}, workspace: {} }
 	for (const scope of ["user", "workspace"] as const) {
-		const path = codexConfig.getPath(scope, ctx.cwd)
+		const path = codexConfigSpec.getPath(scope, ctx.cwd)
 		try {
-			config[scope] = codexConfig.readFile(path)
+			config[scope] = codexConfigSpec.readFile(path)
 		} catch (error) {
 			const label = `${scope[0]?.toUpperCase() ?? ""}${scope.slice(1)}`
 			const message = error instanceof Error ? error.message : String(error)
-			ctx.ui.notify(`${codexConfig.fileName} ignored unreadable ${label} config at ${path}: ${message}`, "warning")
+			ctx.ui.notify(`${codexConfigSpec.fileName} ignored unreadable ${label} config at ${path}: ${message}`, "warning")
 		}
 	}
 	return config
