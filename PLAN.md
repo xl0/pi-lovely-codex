@@ -38,9 +38,9 @@ Current scope:
 - flat persisted keys; field `children` are UI-only
 - field defaults drive typed `get()`, notes, and visibility, not persisted output
 - supported field kinds: `enum`, `boolean`
-- field descriptors derive TypeBox schema and config definition objects
-- helper owns config IO and reusable TUI editor UI; command registration stays in extension code
-- caller owns runtime side effects via `onChange(effective, scoped, ctx)`
+- field descriptors derive TypeBox schema and config spec objects
+- helper owns config IO, extension-local effective state wrapper, and reusable TUI editor UI; command registration stays in extension code
+- caller owns runtime side effects via `onChange(effective, scoped)`
 - immediate writes on field change; unset removes key
 - reset deletes active scope file
 - hidden fields remain persisted/effective
