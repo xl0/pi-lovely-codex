@@ -46,6 +46,17 @@ type FieldValue<Field> = Field extends { kind: "enum"; values: infer Values exte
 	: Field extends { kind: "boolean" }
 		? boolean
 		: never
+type ValidateEnumDefaults<Fields extends readonly ScopedConfigField[]> = {
+	[Index in keyof Fields]: Fields[Index] extends {
+		kind: "enum"
+		values: infer Values extends readonly string[]
+		default: infer Default extends string
+	}
+		? Default extends Values[number]
+			? unknown
+			: { enumDefaultMustBeOneOf: Values[number] }
+		: unknown
+}
 
 type Row = { kind: "field"; field: ScopedConfigField } | { kind: "reset" }
 type RenderTui = { requestRender(): void }
@@ -105,7 +116,7 @@ export function createScopedConfigSchema(fields: readonly ScopedConfigField[]): 
 
 export function defineScopedConfigSpec<const Fields extends readonly ScopedConfigField[]>(options: {
 	fileName: string
-	fields: Fields
+	fields: Fields & ValidateEnumDefaults<Fields>
 }): ScopedConfigSpec<ConfigFromFields<Fields>> & {
 	fields: Fields
 	schema: TObject
