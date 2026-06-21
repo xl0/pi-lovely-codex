@@ -1,6 +1,6 @@
 {
 	"name": "@xl0/pi-lovely-codex",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Pi extension for GPT fast mode and Codex-style apply_patch",
 	"keywords": [
 		"pi-package",
@@ -10,12 +10,20 @@
 	],
 	"type": "module",
 	"publisher": "xl0",
+	"author": {
+		"name": "xl0",
+		"url": "https://github.com/xl0"
+	},
 	"license": "MIT",
 	"homepage": "https://github.com/xl0/pi-lovely-codex#readme",
+	"bugs": {
+		"url": "https://github.com/xl0/pi-lovely-codex/issues"
+	},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/xl0/pi-lovely-codex.git"
 	},
+	"packageManager": "bun@1.3.13",
 	"files": [
 		"extensions/",
 		"README.md",

@@ -13,6 +13,8 @@ State below describes current codebase, not history.
 ## Package shape
 
 - `package.json` publishes `@xl0/pi-lovely-codex` as ESM.
+- Package metadata includes MIT license, xl0 author/publisher, GitHub homepage,
+  repository, issue tracker, and Bun package manager.
 - Pi loads extension entrypoints from `./extensions` via `pi.extensions`.
 - Published files: `extensions/`, `README.md`, `LICENSE`.
 - Runtime deps: none.
