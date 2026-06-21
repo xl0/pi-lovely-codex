@@ -124,12 +124,12 @@ Internal helper exports:
 
 - `defineScopedConfigSpec({ fileName, fields })`: validates field descriptors and builds schema-backed defaults, typed `get()`, and scoped IO
 - `ScopedConfigState<Config>`: wraps a config spec with extension-local effective config state
-- `ConfigFromFields<Fields>`: derives optional config object type from enum/boolean field descriptors, including children
+- `ConfigFromFields<Fields>`: derives optional config object type from enum/boolean field descriptors
 - `createScopedConfigSchema(fields)`: derives flat runtime TypeBox schema from field descriptors
 - `ScopedConfigEditor`: reusable User/Workspace TUI config editor component.
 
 Supported field kinds: `enum`, `boolean`.
-Persisted keys are flat; `children` only controls UI nesting.
+Persisted keys are flat; optional field `depth` controls UI indentation only.
 Defaults originate on fields, are written into generated schema, are exposed through config specs, and are used for typed `get()`, UI notes, and visibility; defaults are not persisted.
 `visibleWhen` reads default-filled effective config through `get()` and can read scoped values through `getScoped()`.
 Hidden fields stay persisted/effective.

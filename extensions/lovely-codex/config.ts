@@ -21,23 +21,23 @@ const codexConfigFields = [
 		label: "add apply_patch",
 		kind: "enum",
 		values: ["on", "off", "gpt-only"],
-		default: "gpt-only",
-		children: [
-			{
-				key: "disableWrite",
-				label: "disable write",
-				kind: "boolean",
-				default: false,
-				visibleWhen: ({ get }) => get("applyPatchAddMode") !== "off"
-			},
-			{
-				key: "disableEdit",
-				label: "disable edit",
-				kind: "boolean",
-				default: false,
-				visibleWhen: ({ get }) => get("applyPatchAddMode") !== "off"
-			}
-		]
+		default: "gpt-only"
+	},
+	{
+		key: "disableWrite",
+		label: "disable write",
+		kind: "boolean",
+		default: false,
+		depth: 1,
+		visibleWhen: ({ get }) => get("applyPatchAddMode") !== "off"
+	},
+	{
+		key: "disableEdit",
+		label: "disable edit",
+		kind: "boolean",
+		default: false,
+		depth: 1,
+		visibleWhen: ({ get }) => get("applyPatchAddMode") !== "off"
 	}
 ] as const satisfies readonly ScopedConfigField[]
 
