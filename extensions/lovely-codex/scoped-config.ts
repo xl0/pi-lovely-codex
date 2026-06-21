@@ -20,8 +20,8 @@ type BaseField = {
 	key: string
 	label: string
 	kind: "enum" | "boolean"
+	depth?: number
 	visibleWhen?: (ctx: VisibilityContext) => boolean
-	children?: readonly ScopedConfigField[]
 }
 
 export type EnumConfigField = BaseField & {
@@ -37,20 +37,17 @@ export type BooleanConfigField = BaseField & {
 
 export type ScopedConfigField = EnumConfigField | BooleanConfigField
 export type ConfigFromFields<Fields extends readonly ScopedConfigField[]> = {
-	[Field in FieldUnion<Fields> as Field["key"]]?: FieldValue<Field>
+	[Field in Fields[number] as Field["key"]]?: FieldValue<Field>
 }
 
 type ConfigDefaults<Config extends object> = { [Key in keyof Config]-?: NonNullable<Config[Key]> } & Record<string, unknown>
-type FieldUnion<Fields extends readonly ScopedConfigField[]> = Fields[number] | ChildFieldUnion<Fields[number]>
-type ChildFieldUnion<Field> = Field extends { children: infer Children extends readonly ScopedConfigField[] } ? FieldUnion<Children> : never
 type FieldValue<Field> = Field extends { kind: "enum"; values: infer Values extends readonly string[] }
 	? Values[number]
 	: Field extends { kind: "boolean" }
 		? boolean
 		: never
 
-type FlatField = ScopedConfigField & { depth: number }
-type Row = { kind: "field"; field: FlatField } | { kind: "reset" }
+type Row = { kind: "field"; field: ScopedConfigField } | { kind: "reset" }
 type RenderTui = { requestRender(): void }
 
 type ScopedConfigChangeHandler<Config extends object> = (effective: Config, scoped: ScopedConfig<Config>) => void
@@ -100,7 +97,7 @@ const scopeTabs = ["user", "workspace"] as const satisfies readonly ConfigScope[
 export function createScopedConfigSchema(fields: readonly ScopedConfigField[]): TObject {
 	validateFields(fields)
 	const properties: Record<string, TSchema> = {}
-	for (const field of flattenFields(fields)) {
+	for (const field of fields) {
 		properties[field.key] = Type.Optional(createFieldSchema(field))
 	}
 	return Type.Object(properties)
@@ -184,7 +181,7 @@ export class ScopedConfigEditor<Config extends object> {
 	private readonly ctx: ExtensionContext
 	private readonly spec: ScopedConfigSpec<Config>
 	private readonly onChange: ScopedConfigChangeHandler<Config>
-	private readonly fields: readonly FlatField[]
+	private readonly fields: readonly ScopedConfigField[]
 	private readonly defaults: ConfigDefaults<Config>
 	private readonly done: (result: undefined) => void
 	private currentTab = 0
@@ -204,7 +201,7 @@ export class ScopedConfigEditor<Config extends object> {
 		this.ctx = options.ctx
 		this.spec = options.spec
 		this.onChange = options.onChange
-		this.fields = flattenFields(options.spec.fields)
+		this.fields = options.spec.fields
 		this.defaults = options.spec.defaults
 		this.scoped = options.scoped
 		this.done = options.done
@@ -296,7 +293,7 @@ export class ScopedConfigEditor<Config extends object> {
 				continue
 			}
 
-			const prefix = this.theme.fg(selected ? "accent" : "muted", `${selected ? "> " : "  "}${"  ".repeat(row.field.depth)}`)
+			const prefix = this.theme.fg(selected ? "accent" : "muted", `${selected ? "> " : "  "}${"  ".repeat(row.field.depth ?? 0)}`)
 			const value = formatScopedValue(this.scoped[scope], row.field)
 			const note = getScopeNote(scope, this.scoped, row.field)
 			const renderedNote = note ? ` ${this.theme.fg("muted", `(${note})`)}` : ""
@@ -392,9 +389,12 @@ function addWrappedWithPrefix(lines: string[], width: number, prefix: string, te
 
 function validateFields(fields: readonly ScopedConfigField[]): void {
 	const keys = new Set<string>()
-	for (const field of flattenFields(fields)) {
+	for (const field of fields) {
 		if (keys.has(field.key)) throw new Error(`Duplicate config field key: ${field.key}`)
 		keys.add(field.key)
+		if (field.depth !== undefined && (!Number.isInteger(field.depth) || field.depth < 0)) {
+			throw new Error(`Config field ${field.key} depth must be a non-negative integer`)
+		}
 
 		if (field.kind !== "enum") continue
 		if (field.values.length === 0) throw new Error(`Enum field ${field.key} must have at least one value`)
@@ -414,23 +414,14 @@ function createFieldSchema(field: ScopedConfigField): TSchema {
 	}
 }
 
-function flattenFields(fields: readonly ScopedConfigField[], depth = 0): FlatField[] {
-	const flattened: FlatField[] = []
-	for (const field of fields) {
-		flattened.push({ ...field, depth })
-		if (field.children) flattened.push(...flattenFields(field.children, depth + 1))
-	}
-	return flattened
-}
-
 function defaultConfig(fields: readonly ScopedConfigField[]): Record<string, unknown> {
 	const defaults: Record<string, unknown> = {}
-	for (const field of flattenFields(fields)) defaults[field.key] ??= field.default
+	for (const field of fields) defaults[field.key] ??= field.default
 	return defaults
 }
 
 function isFieldVisible<Config extends object>(
-	field: FlatField,
+	field: ScopedConfigField,
 	scope: ConfigScope,
 	configs: ScopedConfig<Config>,
 	effective: Record<string, unknown>

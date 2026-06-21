@@ -35,7 +35,7 @@ Current scope:
 
 - fixed User/Workspace scopes
 - shallow merge, Workspace overrides User
-- flat persisted keys; field `children` are UI-only
+- flat persisted keys; field `depth` is UI-only
 - field defaults drive typed `get()`, notes, and visibility, not persisted output
 - supported field kinds: `enum`, `boolean`
 - field descriptors derive TypeBox schema and config spec objects
