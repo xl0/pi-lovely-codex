@@ -1,7 +1,7 @@
 {
 	"name": "@xl0/pi-lovely-codex",
-	"version": "0.0.1",
-	"description": "Pi extension package for better experience with GPT models / Codex sub",
+	"version": "0.1.0",
+	"description": "Pi extension for GPT fast mode and Codex-style apply_patch",
 	"keywords": [
 		"pi-package",
 		"codex",
@@ -9,6 +9,7 @@
 		"openai"
 	],
 	"type": "module",
+	"publisher": "xl0",
 	"license": "MIT",
 	"homepage": "https://github.com/xl0/pi-lovely-codex#readme",
 	"repository": {
@@ -31,7 +32,9 @@
 		"format:check": "biome format .",
 		"biome:check": "biome check ."
 	},
-	"dependencies": {},
+	"dependencies": {
+		"typebox": "*"
+	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.14",
 		"@typescript/native-preview": "^7.0.0-dev.20260502.1",
@@ -41,8 +44,7 @@
 	"peerDependencies": {
 		"@earendil-works/pi-ai": "*",
 		"@earendil-works/pi-coding-agent": "*",
-		"@earendil-works/pi-tui": "*",
-		"typebox": "*"
+		"@earendil-works/pi-tui": "*"
 	},
 	"pi": {
 		"extensions": [
