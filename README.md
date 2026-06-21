@@ -16,6 +16,8 @@ pi -e npm:@xl0/pi-lovely-codex
 
 ## `/lovely-codex`
 
+![Lovely codex settings](https://raw.githubusercontent.com/xl0/pi-lovely-codex/master/assets/lovely-codex-settings.png)
+
 ### GPT fast mode 🏎️
 
 - `default` -> omit `service_tier` - default mode
@@ -25,6 +27,11 @@ pi -e npm:@xl0/pi-lovely-codex
 Applies only to provider `openai` or `openai-codex`, model id starting with `gpt-`. Fast mode shows `🏎️` in status line.
 
 ### apply_patch tool
+
+GPT models have been relentlessly fine-tuned to use the `apply_patch` tool in Codex. They can use the default Pi `edit` tool of course,
+but often make silly mistakes that might be just muscle memory from being trained on `apply_patch` for the edit task.
+
+This extension adds the tool GPT models crave so much.
 
 > Note: Current `apply_patch` implementation shells out to `codex --codex-run-as-apply-patch`. **You need to have codex installed and available on PATH.**
 
@@ -48,3 +55,16 @@ Config scopes:
 - Workspace: `<cwd>/.pi/xl0-pi-lovely-codex.json`
 
 Workspace overrides User. All keys are optional.
+
+## Related projects
+
+|  |  |
+| --- | --- |
+| [Pi Lovely Web](https://github.com/xl0/pi-lovely-web) | `web_search`, `web_fetch`, `web_image` tools |
+| [Pi Lovely Dev Tools](https://github.com/xl0/pi-lovely-dev-tools) | interactive debugging helpers `/tool`, `/show-sysprompt`, `/show-context`, `/llm-stats` |
+| [Pi Lovely IDE](https://github.com/xl0/pi-lovely-ide) | IDE integration |
+| [Pi Lovely Config](https://github.com/xl0/pi-lovely-config) | scoped config helpers for Pi extensions |
+
+---
+
+Like this work? [Hire me](https://alexey.work/cv?ref=pi-lovely-codex)

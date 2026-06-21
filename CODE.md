@@ -273,6 +273,6 @@ Apply-patch tests live under `tests/apply-patch/`.
 - `biome.json`: formatter/linter config aligned with adjacent Pi Lovely packages.
 - `bun.lock`: dependency lock from `bun install`.
 - `README.md`: user docs for install, `/lovely-codex`, scoped config, GPT modes,
-  apply-patch modes, and Codex CLI requirement.
+  apply-patch modes, Codex CLI requirement, and related Lovely Pi projects footer.
 - `docs/APPLY_PATCH_REPORT.md`: source-level notes from Pi `apply_patch`
   review in `pi-codex-conversion`; reference for possible native impl.
