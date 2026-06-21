@@ -23,7 +23,7 @@
 - [x] Copy upstream scenario fixtures into repo.
 - [x] Add Pi `apply_patch` runner to same harness.
 - [x] Extract internal schema-driven scoped config helper and port `/lovely-codex`.
-- [ ] Show a warning when scoped config JSON/schema is invalid and ignored.
+- [x] Show a warning when scoped config JSON/schema is invalid and ignored.
 - [ ] Add string/number field UX before extracting helper to shared package.
 - [ ] Replace Codex-wrapper `apply_patch` with native Pi implementation.
 
