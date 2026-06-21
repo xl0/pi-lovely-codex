@@ -1,13 +1,6 @@
 # @xl0/pi-lovely-codex
 
-Pi extension for GPT service-tier controls and Codex-style `apply_patch` inside Pi.
-
-## What it adds
-
-- `/lovely-codex` interactive TUI config
-- GPT service-tier modes for OpenAI GPT models
-- Codex priority cost adjustment for `openai-codex`
-- file-editing tool control: add `apply_patch`, optionally disable `edit` + `write`
+GPT "Fast mode" control and Codex-style `apply_patch` tool.
 
 ## Install
 
@@ -23,56 +16,35 @@ pi -e npm:@xl0/pi-lovely-codex
 
 ## `/lovely-codex`
 
-Opens tabbed `User` and `Workspace` config.
+### GPT fast mode 🏎️
 
-- `User` -> `~/.pi/agent/xl0-pi-lovely-codex.json`
-- `Workspace` -> `.pi/xl0-pi-lovely-codex.json`
+- `default` -> omit `service_tier` - default mode
+- `fast` -> send `service_tier: "priority"` for `openai` and `openai-codex` - request fast mode on OpenAI API and Codex sub.
+- `fast-codex` -> send priority only for `openai-codex` - request fast mode on Codex sub only.
 
-Workspace overrides User. `unset` removes setting from current scope and falls through to lower scope or default.
-`Reset to default` deletes current scope config file and refreshes local state.
+Applies only to provider `openai` or `openai-codex`, model id starting with `gpt-`. Fast mode shows `🏎️` in status line.
 
-### GPT mode
+### apply_patch tool
 
-- `default` -> omit `service_tier`
-- `fast` -> send `service_tier: "priority"` for `openai` and `openai-codex`
-- `fast-codex` -> send priority only for `openai-codex`
-
-Applies only to OpenAI GPT models: provider `openai` or `openai-codex`, model id starting with `gpt-`.
-
-Non-default effective mode shows `🏎️` in status line.
-
-### Tool modes
+> Note: Current `apply_patch` implementation shells out to `codex --codex-run-as-apply-patch`. **You need to have codex installed and available on PATH.**
 
 `add apply_patch` controls whether Lovely Codex enables the `apply_patch` tool:
 
-- `on` -> enable `apply_patch`
-- `off` -> remove `apply_patch`
-- `gpt-only` -> enable `apply_patch` only when current model id has a `gpt-` segment
+- `on` -> always add the `apply_patch` tool.
+- `off` -> don't add the `apply_patch` tool.
+- `gpt-only` -> enable `apply_patch` only when current model id starts with `gpt-` or contains `/gpt-`.
 
-When `apply_patch` is enabled, indented sub-options can disable built-in file-writing tools:
+Optionally, you can disable the now redundant built-in tools while `apply_patch` is active:
+- `disable write`
+- `disable edit`
 
-- `disable write` -> remove active `write`
-- `disable edit` -> remove active `edit`
+When `apply_patch` becomes inactive, `write`/`edit` are restored only if they were active at session start.
 
 Default effective values: `add apply_patch = gpt-only`, `disable write = off`, `disable edit = off`.
 
-## Config file
+Config scopes:
 
-Example:
+- User: `~/.pi/agent/xl0-pi-lovely-codex.json`
+- Workspace: `<cwd>/.pi/xl0-pi-lovely-codex.json`
 
-```json
-{
-  "gptMode": "fast-codex",
-  "applyPatchAddMode": "gpt-only",
-  "disableWrite": true,
-  "disableEdit": true
-}
-```
-
-All keys optional.
-
-## Notes
-
-- Bad config on session load -> extension falls back to defaults and shows error.
-- Bad config in one `/lovely-codex` scope -> that scope ignored, warning shown.
-- Current `apply_patch` implementation shells out to `codex --codex-run-as-apply-patch`.
+Workspace overrides User. All keys are optional.
