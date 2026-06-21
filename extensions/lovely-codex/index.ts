@@ -53,7 +53,7 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 			config.reset()
 			applyToolConfig()
 			ctx.ui.setStatus("lovely-codex", undefined)
-			ctx.ui.notify(`${codexConfigSpec.fileName} config error: ${error instanceof Error ? error.message : String(error)}`, "error")
+			ctx.ui.notify(`Config error: ${error instanceof Error ? error.message : String(error)}`, "error")
 		}
 	})
 
@@ -101,7 +101,7 @@ function loadCommandConfig(ctx: ExtensionContext): ScopedCodexConfig {
 		} catch (error) {
 			const label = `${scope[0]?.toUpperCase() ?? ""}${scope.slice(1)}`
 			const message = error instanceof Error ? error.message : String(error)
-			ctx.ui.notify(`${codexConfigSpec.fileName} ignored unreadable ${label} config at ${path}: ${message}`, "warning")
+			ctx.ui.notify(`Ignored unreadable ${label} config: ${message}`, "warning")
 		}
 	}
 	return scoped

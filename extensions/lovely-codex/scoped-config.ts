@@ -129,8 +129,9 @@ export function defineScopedConfigSpec<const Fields extends readonly ScopedConfi
 		const raw = readFileSync(path, "utf-8")
 		try {
 			return validator.Parse(JSON.parse(raw)) as Config
-		} catch {
-			return {} as Config
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error)
+			throw new Error(`Invalid config at ${path}: ${message}`)
 		}
 	}
 

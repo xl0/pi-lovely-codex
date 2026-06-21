@@ -63,7 +63,8 @@ Workspace overrides user through shallow merge:
 ```
 
 Config IO is sync and TypeBox-validated through the internal scoped-config helper.
-Missing files and invalid JSON/schema load as `{}` for that scope; next save overwrites the file.
+Missing files load as `{}` for that scope.
+Invalid JSON/schema throws a diagnostic error with the file path.
 Resetting a scope deletes its config file; missing file is OK.
 
 ## Extension lifecycle
@@ -166,7 +167,7 @@ Save behavior:
 - updates status indicator
 - reset clears active scope in memory, deletes its file, then reapplies state
 
-If one scoped config is invalid JSON/schema, command opens that scope empty;
+If one scoped config is invalid JSON/schema, command warns and opens that scope empty;
 other scope still loads. The next save overwrites the invalid file.
 
 ## GPT mode hooks
