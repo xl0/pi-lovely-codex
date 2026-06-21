@@ -134,6 +134,7 @@ Persisted keys are flat; optional field `depth` controls UI indentation only.
 Defaults originate on fields, are written into generated schema, are exposed through config specs, and are used for typed `get()`, UI notes, and visibility; defaults are not persisted.
 `visibleWhen` reads default-filled effective config through `get()` and can read scoped values through `getScoped()`.
 Hidden fields stay persisted/effective.
+Enum defaults are checked against their values at type level and runtime.
 Writes are immediate per field cycle; unset deletes only that key.
 Reset deletes the active scope file.
 Caller owns runtime side effects through `onChange(effective, scoped)`.
@@ -143,6 +144,7 @@ Caller owns runtime side effects through `onChange(effective, scoped)`.
 Registered in `extensions/lovely-codex/index.ts`; scoped config helper only supplies config IO and editor UI.
 
 Command takes no args and opens a TUI config editor.
+Non-TUI invocation is ignored.
 
 UI:
 

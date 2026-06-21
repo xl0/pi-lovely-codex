@@ -65,12 +65,9 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 	pi.registerCommand("lovely-codex", {
 		description: "Configure Lovely Codex settings",
 		async handler(_args, ctx) {
-			const scoped = loadCommandConfig(ctx)
+			if (ctx.mode !== "tui") return
 
-			if (ctx.mode !== "tui") {
-				ctx.ui.notify("The interactive /lovely-codex settings UI is only available in TUI mode.", "warning")
-				return
-			}
+			const scoped = loadCommandConfig(ctx)
 
 			await ctx.ui.custom<void>(
 				(tui, theme, _keybindings, done) =>
