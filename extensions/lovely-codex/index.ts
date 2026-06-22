@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
 import { ScopedConfigEditor, ScopedConfigState } from "@xl0/pi-lovely-config"
 import { registerApplyPatchTool } from "./apply-patch.js"
-import { type CodexConfig, codexConfigSpec, type ScopedCodexConfig } from "./config.js"
+import { codexConfigSpec, type ScopedCodexConfig } from "./config.js"
 import { registerGptModeHooks } from "./gpt-mode.js"
 
 function isGptModel(model: ExtensionContext["model"]): boolean {
@@ -36,8 +36,8 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 	const refreshConfig = (cwd: string) => {
 		config.load(cwd)
 	}
-	const setConfig = (nextConfig: CodexConfig, ctx: ExtensionContext) => {
-		config.set(nextConfig)
+	const setConfig = (scoped: ScopedCodexConfig, ctx: ExtensionContext) => {
+		config.setScoped(scoped)
 		applyToolConfig()
 		updateStatus(ctx)
 	}
@@ -77,8 +77,8 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 						ctx,
 						spec: codexConfigSpec,
 						scoped,
-						onChange(effective) {
-							setConfig(effective, ctx)
+						onChange(_resolved, scoped) {
+							setConfig(scoped, ctx)
 						},
 						done
 					})

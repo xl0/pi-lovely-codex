@@ -30,7 +30,9 @@ State below describes current codebase, not history.
 
 Implemented in `extensions/lovely-codex/config.ts` as `codexConfigFields` plus
 `codexConfigSpec = defineScopedConfigSpec(...)`.
-`CodexConfig` is derived from the field descriptors with `ConfigFromFields`.
+`CodexConfig` is the default-filled resolved shape derived from field
+descriptors with `ConfigFromFields`; persisted scoped patches are
+`ScopedConfigPatch<CodexConfig>`.
 Field descriptors drive runtime schema/defaults/UI and static config typing.
 
 Config schema:
@@ -44,7 +46,7 @@ Config schema:
 }
 ```
 
-All fields are optional. Omitted means unset in that scope.
+All persisted fields are optional. Omitted means unset in that scope.
 
 Defaults after scope merge, exposed as `codexConfigSpec.defaults`:
 
@@ -64,9 +66,11 @@ Workspace overrides user through shallow merge:
 { ...user, ...workspace }
 ```
 
-Config IO is sync and TypeBox-validated through `@xl0/pi-lovely-config`.
+Config IO is sync and known-field validated through `@xl0/pi-lovely-config`.
 Missing files load as `{}` for that scope.
-Invalid JSON/schema throws a diagnostic error with the file path.
+Invalid JSON/known-field type throws a diagnostic error with the file path.
+Unknown file properties are preserved across load/save but ignored by typed
+field behavior.
 Resetting a scope deletes its config file; missing file is OK.
 
 ## Extension lifecycle
@@ -75,7 +79,8 @@ Implemented in `extensions/lovely-codex/index.ts`.
 
 Entrypoint `lovelyCodexExtension(pi)` owns process-local state:
 
-- `config`: `ScopedConfigState<CodexConfig>` holding effective merged config
+- `config`: `ScopedConfigState<CodexConfig>` holding scoped patches and
+  default-filled effective config
 - `editToolBaseline`: active tool set captured at session start
 - `selectedModelIsGpt`: current model GPT-ness for `gpt-only` apply-patch mode
 
@@ -127,9 +132,9 @@ with `bun link @xl0/pi-lovely-config`.
 Used exports:
 
 - `defineScopedConfigSpec({ fileName, fields })`: validates field descriptors and builds schema-backed defaults, typed `get()`, and scoped IO
-- `ScopedConfigState<Config>`: wraps a config spec with extension-local effective config state
-- `ConfigFromFields<Fields>`: derives optional config object type from enum/boolean field descriptors
-- `createScopedConfigSchema(fields)`: derives flat runtime TypeBox schema from field descriptors
+- `ScopedConfigState<Config>`: wraps a config spec with extension-local scoped/effective config state
+- `ConfigFromFields<Fields>`: derives resolved config object type from field descriptors
+- `ScopedConfigPatch<Config>`: stores optional per-scope config patches
 - `ScopedConfigEditor`: reusable scoped TUI config editor component.
 
 Lovely Codex currently uses `enum` and `boolean` fields.
@@ -172,7 +177,7 @@ Save behavior:
 - updates status indicator
 - reset clears active scope in memory, deletes its file, then reapplies state
 
-If one scoped config is invalid JSON/schema, command warns and opens that scope empty;
+If one scoped config is invalid JSON/type, command warns and opens that scope empty;
 other active scopes still load. The next save overwrites the invalid file.
 
 ## GPT mode hooks
