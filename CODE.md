@@ -17,7 +17,7 @@ State below describes current codebase, not history.
   repository, issue tracker, and Bun package manager.
 - Pi loads extension entrypoints from `./extensions` via `pi.extensions`.
 - Published files: `extensions/`, `README.md`, `LICENSE`.
-- Runtime deps: none.
+- Runtime deps: `@xl0/pi-lovely-config` plus `typebox`.
 - Peer deps: Pi agent/AI/TUI packages plus `typebox`.
 - Dev deps: Bun types, TypeScript/native preview, Biome.
 - Main scripts:
@@ -64,8 +64,7 @@ Workspace overrides user through shallow merge:
 { ...user, ...workspace }
 ```
 
-Config IO is sync and TypeBox-validated through the internal scoped-config helper.
-Validation uses `typebox/compile` for Pi extension-loader compatibility.
+Config IO is sync and TypeBox-validated through `@xl0/pi-lovely-config`.
 Missing files load as `{}` for that scope.
 Invalid JSON/schema throws a diagnostic error with the file path.
 Resetting a scope deletes its config file; missing file is OK.
@@ -122,17 +121,18 @@ Baseline prevents extension from enabling tools that were not active before it r
 
 ## Scoped config helper
 
-Implemented in `extensions/lovely-codex/scoped-config.ts`.
+Imported from `@xl0/pi-lovely-config`; during local development it is overridden
+with `bun link @xl0/pi-lovely-config`.
 
-Internal helper exports:
+Used exports:
 
 - `defineScopedConfigSpec({ fileName, fields })`: validates field descriptors and builds schema-backed defaults, typed `get()`, and scoped IO
 - `ScopedConfigState<Config>`: wraps a config spec with extension-local effective config state
 - `ConfigFromFields<Fields>`: derives optional config object type from enum/boolean field descriptors
 - `createScopedConfigSchema(fields)`: derives flat runtime TypeBox schema from field descriptors
-- `ScopedConfigEditor`: reusable User/Workspace TUI config editor component.
+- `ScopedConfigEditor`: reusable scoped TUI config editor component.
 
-Supported field kinds: `enum`, `boolean`.
+Lovely Codex currently uses `enum` and `boolean` fields.
 Persisted keys are flat; optional field `depth` controls UI indentation only.
 Defaults originate on fields, are written into generated schema, are exposed through config specs, and are used for typed `get()`, UI notes, and visibility; defaults are not persisted.
 `visibleWhen` reads default-filled effective config through `get()` and can read scoped values through `getScoped()`.
@@ -173,7 +173,7 @@ Save behavior:
 - reset clears active scope in memory, deletes its file, then reapplies state
 
 If one scoped config is invalid JSON/schema, command warns and opens that scope empty;
-other scope still loads. The next save overwrites the invalid file.
+other active scopes still load. The next save overwrites the invalid file.
 
 ## GPT mode hooks
 

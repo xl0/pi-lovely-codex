@@ -10,6 +10,7 @@
 - Adjust priority pricing on finalized `openai-codex` assistant messages; normal OpenAI provider responses keep native provider pricing behavior.
 - `docs/APPLY_PATCH_REPORT.md` captures source review of existing Pi-native `apply_patch`; use as reference when replacing current wrapper.
 - File-editing tool exposure is split: `applyPatchAddMode` (`on`/`off`/`gpt-only`, default `gpt-only`) controls adding `apply_patch`; `disableWrite`/`disableEdit` booleans (default `false`) remove baseline `write`/`edit` only while `apply_patch` is active. Config is scoped like `gptMode`.
+- Scoped config helper comes from `@xl0/pi-lovely-config`; local development overrides it with `bun link @xl0/pi-lovely-config`.
 
 ## Todo
 - [x] Add package manifest and Pi extension entry.
@@ -24,12 +25,12 @@
 - [x] Add Pi `apply_patch` runner to same harness.
 - [x] Extract internal schema-driven scoped config helper and port `/lovely-codex`.
 - [x] Show a warning when scoped config JSON/schema is invalid and ignored.
-- [ ] Add string/number field UX before extracting helper to shared package.
+- [x] Link local `@xl0/pi-lovely-config` package with `bun link` and import scoped config helpers from it.
 - [ ] Replace Codex-wrapper `apply_patch` with native Pi implementation.
 
 ## Scoped config helper extraction
 
-Implemented internally in `extensions/lovely-codex/scoped-config.ts`.
+Moved to `../pi-lovely-config/`; this package consumes it through local npm file link.
 
 Current scope:
 
@@ -37,7 +38,7 @@ Current scope:
 - shallow merge, Workspace overrides User
 - flat persisted keys; field `depth` is UI-only
 - field defaults drive typed `get()`, notes, and visibility, not persisted output
-- supported field kinds: `enum`, `boolean`
+- this package uses supported field kinds: `enum`, `boolean`
 - field descriptors derive TypeBox schema and config spec objects
 - helper owns config IO, extension-local effective state wrapper, and reusable TUI editor UI; command registration stays in extension code
 - caller owns runtime side effects via `onChange(effective, scoped)`
@@ -45,4 +46,4 @@ Current scope:
 - reset deletes active scope file
 - hidden fields remain persisted/effective
 
-Before extracting to a shared helper/package, decide and implement string/number editing UX.
+String field UX exists in the shared package; number fields are not used here.
