@@ -4,7 +4,7 @@ import {
 	defineScopedConfigSpec,
 	type ScopedConfig,
 	type ScopedConfigField
-} from "./scoped-config.js"
+} from "@xl0/pi-lovely-config"
 
 export const CONFIG_FILE_NAME = "xl0-pi-lovely-codex.json"
 

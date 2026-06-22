@@ -1,8 +1,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
+import { ScopedConfigEditor, ScopedConfigState } from "@xl0/pi-lovely-config"
 import { registerApplyPatchTool } from "./apply-patch.js"
 import { type CodexConfig, codexConfigSpec, type ScopedCodexConfig } from "./config.js"
 import { registerGptModeHooks } from "./gpt-mode.js"
-import { ScopedConfigEditor, ScopedConfigState } from "./scoped-config.js"
 
 function isGptModel(model: ExtensionContext["model"]): boolean {
 	return model?.id.startsWith("gpt-") || model?.id.includes("/gpt-") || false
@@ -91,7 +91,7 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 
 function loadCommandConfig(ctx: ExtensionContext): ScopedCodexConfig {
 	const scoped: ScopedCodexConfig = { user: {}, workspace: {} }
-	for (const scope of ["user", "workspace"] as const) {
+	for (const scope of codexConfigSpec.scopes) {
 		const path = codexConfigSpec.getPath(scope, ctx.cwd)
 		try {
 			scoped[scope] = codexConfigSpec.readFileOrEmpty(path)
