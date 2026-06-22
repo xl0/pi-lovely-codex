@@ -2,8 +2,8 @@ import {
 	type ConfigFromFields,
 	type ConfigScope,
 	defineScopedConfigSpec,
-	type ScopedConfig,
-	type ScopedConfigField
+	type ScopedConfigField,
+	type ScopedConfigPatch
 } from "@xl0/pi-lovely-config"
 
 export const CONFIG_FILE_NAME = "xl0-pi-lovely-codex.json"
@@ -49,4 +49,4 @@ export const codexConfigSpec = defineScopedConfigSpec({
 })
 
 export type { ConfigScope }
-export type ScopedCodexConfig = ScopedConfig<CodexConfig>
+export type ScopedCodexConfig = ScopedConfigPatch<CodexConfig>
