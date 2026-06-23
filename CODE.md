@@ -65,6 +65,7 @@ Workspace overrides user through shallow merge:
 ```
 
 Config IO is sync and TypeBox-validated through the internal scoped-config helper.
+Validation uses `typebox/compile` for Pi extension-loader compatibility.
 Missing files load as `{}` for that scope.
 Invalid JSON/schema throws a diagnostic error with the file path.
 Resetting a scope deletes its config file; missing file is OK.
