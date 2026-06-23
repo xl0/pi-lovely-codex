@@ -3,7 +3,7 @@ import { dirname, join, resolve } from "node:path"
 import { CONFIG_DIR_NAME, type ExtensionContext, getAgentDir, type Theme } from "@earendil-works/pi-coding-agent"
 import { Key, matchesKey, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui"
 import { type TObject, type TSchema, Type } from "typebox"
-import Schema from "typebox/schema"
+import { Compile } from "typebox/compile"
 
 export type ConfigScope = "user" | "workspace"
 export type ScopedConfig<Config extends object> = Record<ConfigScope, Config>
@@ -124,7 +124,7 @@ export function defineScopedConfigSpec<const Fields extends readonly ScopedConfi
 	type Config = ConfigFromFields<Fields>
 	const schema = createScopedConfigSchema(options.fields)
 	const defaults = defaultConfig(options.fields) as ConfigDefaults<Config>
-	const validator = Schema.Compile(schema)
+	const validator = Compile(schema)
 
 	function get<Key extends keyof Config>(config: Config, key: Key): NonNullable<Config[Key]> {
 		const value = getConfigValue(config, String(key))
