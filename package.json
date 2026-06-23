@@ -1,6 +1,6 @@
 {
 	"name": "@xl0/pi-lovely-codex",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"description": "Pi extension for GPT fast mode and Codex-style apply_patch",
 	"keywords": [
 		"pi-package",
