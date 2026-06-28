@@ -3,7 +3,7 @@
 ## High-level decisions
 - Package is `@xl0/pi-lovely-codex`.
 - Keep package boilerplate aligned with `pi-lovely-dev-tools` and `pi-lovely-web`.
-- GPT mode config lives in `xl0-pi-lovely-codex.json` under User `~/.pi/agent/` and Workspace `.pi/`; Workspace overrides User. Omitted `gptMode` is unset; effective mode falls through to User or default. Runtime keeps configs by scope in memory; command writes only touched scope. Invalid JSON/known-field type is treated like missing config for that scope and overwritten on save.
+- GPT mode config lives in `xl0-pi-lovely-codex.json` under User `~/.pi/agent/` and Workspace `.pi/`; Workspace overrides User. Omitted `gptMode` is unset; effective mode falls through to User or default. Runtime keeps resolved config plus raw scoped patches in memory; command writes only touched keys. Invalid known values warn and are ignored while resolving. Invalid JSON/non-object files are hard config errors.
 - Non-default GPT mode shows `🏎️` in the status line; `default` clears the indicator.
 - GPT modes map to OpenAI service tiers: `default` -> omit service tier, `fast` -> priority for `openai` and `openai-codex`, `fast-codex` -> priority only for `openai-codex`.
 - Apply service-tier payload only to OpenAI GPT models (`provider` `openai`/`openai-codex`, id starts `gpt-`) to avoid breaking other OpenAI-compatible providers.
@@ -38,13 +38,13 @@ Current scope:
 - shallow merge, Workspace overrides User
 - flat persisted known keys; unknown file properties are preserved across save
 - field `depth` is UI-only
-- field defaults drive typed `get()`, notes, and visibility, not persisted output
+- field defaults drive resolved config, notes, and visibility, not persisted output
 - this package uses supported field kinds: `enum`, `boolean`
-- field descriptors derive TypeBox schema and config spec objects
-- helper owns config IO, extension-local effective state wrapper, and reusable TUI editor UI; command registration stays in extension code
-- caller owns runtime side effects via `onChange(effective, scoped)`
+- field builders derive JSON schema and stateful config objects
+- helper owns config IO, key updates/reset, and reusable TUI editor UI; command registration stays in extension code
+- caller owns runtime side effects via `onChange(config)`
 - immediate writes on field change; unset removes key
-- reset deletes active scope file
+- reset deletes known keys in active scope and preserves unknown keys
 - hidden fields remain persisted/effective
 
 String field UX exists in the shared package; number fields are not used here.

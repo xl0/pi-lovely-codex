@@ -1,52 +1,32 @@
-import {
-	type ConfigFromFields,
-	type ConfigScope,
-	defineScopedConfigSpec,
-	type ScopedConfigField,
-	type ScopedConfigPatch
-} from "@xl0/pi-lovely-config"
+import { type ConfigFromSchema, type ConfigScope, defineScopedConfig, field, type ScopedConfigPatch } from "@xl0/pi-lovely-config"
 
 export const CONFIG_FILE_NAME = "xl0-pi-lovely-codex.json"
 
-const codexConfigFields = [
-	{
-		key: "gptMode",
-		label: "GPT mode",
-		kind: "enum",
-		values: ["default", "fast", "fast-codex"],
-		default: "default"
-	},
-	{
-		key: "applyPatchAddMode",
-		label: "add apply_patch",
-		kind: "enum",
-		values: ["on", "off", "gpt-only"],
-		default: "gpt-only"
-	},
-	{
-		key: "disableWrite",
+const codexConfigSchema = {
+	gptMode: field.enum(["default", "fast", "fast-codex"], "default", {
+		label: "GPT mode"
+	}),
+	applyPatchAddMode: field.enum(["on", "off", "gpt-only"], "gpt-only", {
+		label: "add apply_patch"
+	}),
+	disableWrite: field.boolean(false, {
 		label: "disable write",
-		kind: "boolean",
-		default: false,
 		depth: 1,
 		visibleWhen: ({ get }) => get("applyPatchAddMode") !== "off"
-	},
-	{
-		key: "disableEdit",
+	}),
+	disableEdit: field.boolean(false, {
 		label: "disable edit",
-		kind: "boolean",
-		default: false,
 		depth: 1,
 		visibleWhen: ({ get }) => get("applyPatchAddMode") !== "off"
-	}
-] as const satisfies readonly ScopedConfigField[]
+	})
+} as const
 
-export type CodexConfig = ConfigFromFields<typeof codexConfigFields>
+export type CodexConfig = ConfigFromSchema<typeof codexConfigSchema>
 
-export const codexConfigSpec = defineScopedConfigSpec({
+export const codexConfigSpec = defineScopedConfig({
 	fileName: CONFIG_FILE_NAME,
-	fields: codexConfigFields
+	schema: codexConfigSchema
 })
 
 export type { ConfigScope }
-export type ScopedCodexConfig = ScopedConfigPatch<CodexConfig>
+export type ScopedCodexConfig = ScopedConfigPatch
