@@ -7,6 +7,7 @@ import {
 	generateDiffString,
 	generateUnifiedPatch,
 	renderDiff,
+	type Theme,
 	withFileMutationQueue
 } from "@earendil-works/pi-coding-agent"
 import { Container, Spacer, Text } from "@earendil-works/pi-tui"
@@ -50,6 +51,20 @@ function readTextContent(result: { content: Array<{ type: string; text?: string 
 
 function trimTrailingNewline(text: string): string {
 	return text.endsWith("\n") ? text.slice(0, -1) : text
+}
+
+function renderApplyPatchInput(input: string, theme: Theme): string {
+	return input
+		.split("\n")
+		.map(line => {
+			if (line.startsWith("*** ")) return theme.fg("accent", theme.bold(line))
+			if (line.startsWith("@@")) return theme.fg("mdLink", line)
+			if (line.startsWith("+")) return theme.fg("toolDiffAdded", line)
+			if (line.startsWith("-")) return theme.fg("toolDiffRemoved", line)
+			if (line.startsWith(" ")) return theme.fg("toolDiffContext", line)
+			return theme.fg("muted", line)
+		})
+		.join("\n")
 }
 
 function parseTouchedPaths(input: string): string[] {
@@ -172,10 +187,18 @@ export const applyPatchTool = defineTool({
 	],
 	parameters: ApplyPatchParams,
 	executionMode: "sequential",
-	renderCall(args, theme) {
-		const paths = parseTouchedPaths(args.input ?? "").join(", ")
+	renderCall(args, theme, context) {
+		const input = typeof args?.input === "string" ? args.input : ""
+		const paths = parseTouchedPaths(input).join(", ")
 		const suffix = paths ? ` ${theme.fg("accent", paths)}` : ""
-		return new Text(`${theme.fg("toolTitle", theme.bold("apply_patch"))}${suffix}`, 0, 0)
+		const header = `${theme.fg("toolTitle", theme.bold("apply_patch"))}${suffix}`
+		if (!context.isPartial || !input) return new Text(header, 0, 0)
+
+		const component = new Container()
+		component.addChild(new Text(header, 0, 0))
+		component.addChild(new Spacer(1))
+		component.addChild(new Text(renderApplyPatchInput(input, theme), 0, 0))
+		return component
 	},
 	async execute(toolCallId, params, _signal, _onUpdate, ctx) {
 		const touchedPaths = parseTouchedPaths(params.input)

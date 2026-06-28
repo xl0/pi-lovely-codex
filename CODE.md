@@ -244,6 +244,8 @@ Edit-style details kept for Pi UI:
 TUI behavior:
 
 - call line highlights touched filenames like `edit`
+- while the tool call/result is pending, call render shows streamed `input`
+  with lightweight apply-patch diff coloring
 - result renders line-numbered diffs through Pi `renderDiff`
 - failures keep thrown error text as LLM tool-result content, while a `tool_result`
   hook attaches captured command details for UI rendering
