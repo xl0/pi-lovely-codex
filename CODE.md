@@ -18,7 +18,7 @@ State below describes current codebase, not history.
 - Pi loads extension entrypoints from `./extensions` via `pi.extensions`.
 - Published files: `extensions/`, `README.md`, `LICENSE`.
 - Runtime deps: `@xl0/pi-lovely-config` plus `typebox`.
-- Peer deps: Pi agent/AI/TUI packages plus `typebox`.
+- Peer deps: Pi agent/AI/TUI packages.
 - Dev deps: Bun types, TypeScript/native preview, Biome.
 - Main scripts:
   - `typecheck`: `tsgo --noEmit`
@@ -28,12 +28,13 @@ State below describes current codebase, not history.
 
 ## Config model
 
-Implemented in `extensions/lovely-codex/config.ts` as `codexConfigFields` plus
-`codexConfigSpec = defineScopedConfigSpec(...)`.
-`CodexConfig` is the default-filled resolved shape derived from field
-descriptors with `ConfigFromFields`; persisted scoped patches are
-`ScopedConfigPatch<CodexConfig>`.
-Field descriptors drive runtime schema/defaults/UI and static config typing.
+Implemented in `extensions/lovely-codex/config.ts` as `codexConfigSchema` plus
+`codexConfigSpec = defineScopedConfig(...)`.
+`CodexConfig` is the default-filled resolved shape derived from field schema
+with `ConfigFromSchema`; loaded scoped patches on `codexConfigSpec.scoped` are
+raw `ScopedConfigPatch` records so unknown/invalid file values can survive
+load/save.
+Field builders drive runtime schema/defaults/UI and static config typing.
 
 Config schema:
 
@@ -66,12 +67,15 @@ Workspace overrides user through shallow merge:
 { ...user, ...workspace }
 ```
 
-Config IO is sync and known-field validated through `@xl0/pi-lovely-config`.
+Config IO is sync through stateful `@xl0/pi-lovely-config` config instances.
 Missing files load as `{}` for that scope.
-Invalid JSON/known-field type throws a diagnostic error with the file path.
-Unknown file properties are preserved across load/save but ignored by typed
-field behavior.
-Resetting a scope deletes its config file; missing file is OK.
+Invalid JSON or non-object config files throw a diagnostic error with the file
+path.
+Invalid known values produce warnings and are ignored while resolving.
+Unknown file properties are preserved across load/save but ignored by resolved
+typed behavior.
+Resetting a scope deletes known keys in that scope, preserves unknown keys, and
+removes the file if empty.
 
 ## Extension lifecycle
 
@@ -79,8 +83,7 @@ Implemented in `extensions/lovely-codex/index.ts`.
 
 Entrypoint `lovelyCodexExtension(pi)` owns process-local state:
 
-- `config`: `ScopedConfigState<CodexConfig>` holding scoped patches and
-  default-filled effective config
+- `configValue`: default-filled effective config
 - `editToolBaseline`: active tool set captured at session start
 - `selectedModelIsGpt`: current model GPT-ness for `gpt-only` apply-patch mode
 
@@ -93,7 +96,7 @@ On `session_start`:
 
 If config loading fails due to an unreadable file or other IO error:
 
-- config resets to empty scopes
+- config resets to empty scopes/defaults
 - tool config applies defaults
 - status clears
 - UI shows error notification keyed by config filename
@@ -131,21 +134,23 @@ with `bun link @xl0/pi-lovely-config`.
 
 Used exports:
 
-- `defineScopedConfigSpec({ fileName, fields })`: validates field descriptors and builds schema-backed defaults, typed `get()`, and scoped IO
-- `ScopedConfigState<Config>`: wraps a config spec with extension-local scoped/effective config state
-- `ConfigFromFields<Fields>`: derives resolved config object type from field descriptors
-- `ScopedConfigPatch<Config>`: stores optional per-scope config patches
+- `defineScopedConfig({ fileName, schema })`: validates field schema and returns a stateful config instance with defaults, scoped IO, scoped updates, and reset
+- `field.enum()`, `field.boolean()`: build this extension's supported fields
+- `ConfigFromSchema<Schema>`: derives resolved config object type from schema
+- `ResolvedConfig<Config>`: default-filled config value type
+- `ScopedConfigPatch`: raw per-scope config patches
 - `ScopedConfigEditor`: reusable scoped TUI config editor component.
 
 Lovely Codex currently uses `enum` and `boolean` fields.
 Persisted keys are flat; optional field `depth` controls UI indentation only.
-Defaults originate on fields, are written into generated schema, are exposed through config specs, and are used for typed `get()`, UI notes, and visibility; defaults are not persisted.
+Defaults originate on fields, are written into generated schema, are exposed through the config instance, and are used for resolved config, UI notes, and visibility; defaults are not persisted.
 `visibleWhen` reads default-filled effective config through `get()` and can read scoped values through `getScoped()`.
 Hidden fields stay persisted/effective.
 Enum defaults are checked against their values at type level and runtime.
+Manual invalid known values warn and are ignored while resolving until fixed.
 Writes are immediate per field cycle; unset deletes only that key.
-Reset deletes the active scope file.
-Caller owns runtime side effects through `onChange(effective, scoped)`.
+Reset deletes known keys from the active scope and preserves unknown keys.
+Caller owns runtime side effects through `onChange(config)`.
 
 ## `/lovely-codex` command
 
@@ -172,13 +177,14 @@ UI:
 Save behavior:
 
 - writes only active scope immediately
-- updates command-local scoped config and extension effective config through helper `onChange`
+- updates the stateful config instance and extension effective config through helper `onChange`
 - reapplies tool activation
 - updates status indicator
-- reset clears active scope in memory, deletes its file, then reapplies state
+- reset clears known active-scope keys, preserves unknown keys, then reapplies state
 
-If one scoped config is invalid JSON/type, command warns and opens that scope empty;
-other active scopes still load. The next save overwrites the invalid file.
+Manual invalid known values show warnings and are ignored while resolving.
+Invalid JSON or non-object config files show an error and the command does not
+open until the file is fixed.
 
 ## GPT mode hooks
 
