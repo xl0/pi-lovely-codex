@@ -41,7 +41,7 @@
 		"biome:check": "biome check ."
 	},
 	"dependencies": {
-		"@xl0/pi-lovely-config": "*",
+		"@xl0/pi-lovely-config": "^0.1.0",
 		"typebox": "*"
 	},
 	"devDependencies": {

@@ -30,10 +30,9 @@ State below describes current codebase, not history.
 
 Implemented in `extensions/lovely-codex/config.ts` as `codexConfigSchema` plus
 `codexConfigSpec = defineScopedConfig(...)`.
-`CodexConfig` is the default-filled resolved shape derived from field schema
-with `ConfigFromSchema`; loaded scoped patches on `codexConfigSpec.scoped` are
-raw `ScopedConfigPatch` records so unknown/invalid file values can survive
-load/save.
+`CodexConfig` is the effective value shape derived from field schema with
+`ConfigFromSchema`; loaded scoped patches on `codexConfigSpec.scoped` are raw
+per-scope records so unknown/invalid file values can survive load/save.
 Field builders drive runtime schema/defaults/UI and static config typing.
 
 Config schema:
@@ -137,8 +136,7 @@ Used exports:
 - `defineScopedConfig({ fileName, schema })`: validates field schema and returns a stateful config instance with defaults, scoped IO, scoped updates, and reset
 - `field.enum()`, `field.boolean()`: build this extension's supported fields
 - `ConfigFromSchema<Schema>`: derives resolved config object type from schema
-- `ResolvedConfig<Config>`: default-filled config value type
-- `ScopedConfigPatch`: raw per-scope config patches
+- `ScopedConfig<Config>`: public config instance type; used to derive scoped patch type
 - `ScopedConfigEditor`: reusable scoped TUI config editor component.
 
 Lovely Codex currently uses `enum` and `boolean` fields.
