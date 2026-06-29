@@ -26,8 +26,8 @@ State below describes current codebase, not history.
 
 ## Config model
 
-Implemented in `extensions/lovely-codex/config.ts` as `codexConfigSchema` plus
-`codexConfigSpec = defineScopedConfig(...)`.
+Implemented in `extensions/lovely-codex/config.ts` as private `codexConfigSchema`
+plus exported `codexConfigSpec = defineScopedConfig(...)`.
 `CodexConfig` is the effective value shape derived from field schema with
 `ConfigFromSchema`. Loaded scoped patches live on `codexConfigSpec.scoped` as
 raw per-scope records so unknown/invalid file values can survive load/save.

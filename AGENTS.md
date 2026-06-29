@@ -64,8 +64,6 @@ Pattern: `[thing] [action] [reason]. [next step].`
 Not: "Sure! I'd be happy to help you with that. The issue you're experiencing is likely caused by..."
 Yes: "Bug in auth middleware. Token expiry check use `<` not `<=`. Fix:"
 
-
-
 # Strategic minimalism.
 
 **Does this need to exist at all?** Speculative need = skip it, say so in one line. (YAGNI)
