@@ -19,11 +19,9 @@ State below describes current codebase, not history.
 - Published files: `extensions/`, `README.md`, `LICENSE`.
 - Runtime deps: `@xl0/pi-lovely-config` plus `typebox`.
 - Peer deps: Pi agent/AI/TUI packages.
-- Dev deps: Bun types, TypeScript/native preview, Biome.
+- Dev deps: TypeScript/native preview and Biome.
 - Main scripts:
   - `typecheck`: `tsgo --noEmit`
-  - `test`: `bun test`
-  - `test:apply-patch`: `bun test tests/apply-patch`
   - `check`: typecheck + Biome check
 
 ## Config model
@@ -31,8 +29,8 @@ State below describes current codebase, not history.
 Implemented in `extensions/lovely-codex/config.ts` as `codexConfigSchema` plus
 `codexConfigSpec = defineScopedConfig(...)`.
 `CodexConfig` is the effective value shape derived from field schema with
-`ConfigFromSchema`; loaded scoped patches on `codexConfigSpec.scoped` are raw
-per-scope records so unknown/invalid file values can survive load/save.
+`ConfigFromSchema`. Loaded scoped patches live on `codexConfigSpec.scoped` as
+raw per-scope records so unknown/invalid file values can survive load/save.
 Field builders drive runtime schema/defaults/UI and static config typing.
 
 Config schema:
@@ -136,7 +134,6 @@ Used exports:
 - `defineScopedConfig({ fileName, schema })`: validates field schema and returns a stateful config instance with defaults, scoped IO, scoped updates, and reset
 - `field.enum()`, `field.boolean()`: build this extension's supported fields
 - `ConfigFromSchema<Schema>`: derives resolved config object type from schema
-- `ScopedConfig<Config>`: public config instance type; used to derive scoped patch type
 - `ScopedConfigEditor`: reusable scoped TUI config editor component.
 
 Lovely Codex currently uses `enum` and `boolean` fields.
@@ -263,28 +260,16 @@ TUI behavior:
 - filename headers are prefixed only for multi-file diffs
 
 Current impl delegates semantics to Codex CLI instead of native patch parser.
+No native implementation is currently planned.
 
 ## Tests
 
-Apply-patch tests live under `tests/apply-patch/`.
-
-- `runners.ts`: shared black-box runner interface.
-  - direct Codex CLI runner
-  - Pi wrapper runner using extension `runCodexApplyPatch()`
-- `fs.ts`: temp dir, fixture copy, recursive snapshot helpers.
-- `scenario.test.ts`: runs copied upstream Codex scenarios against each runner;
-  compares final filesystem state.
-- `cli.test.ts`: explicit stdout/stderr/exit-code behavior cases.
-- `tool.test.ts`: custom tool render/error propagation checks.
-- `fixtures/scenarios/`: copied Codex fixture corpus with
-  `input/`, `expected/`, `patch.txt` layout.
+No automated tests are currently kept in this package.
 
 ## Tooling and docs
 
-- `tsconfig.json`: strict TypeScript for `extensions/` and `tests/`.
+- `tsconfig.json`: strict TypeScript for `extensions/`.
 - `biome.json`: formatter/linter config aligned with adjacent Pi Lovely packages.
-- `bun.lock`: dependency lock from `bun install`.
+- lockfiles are ignored; package scripts run through Bun.
 - `README.md`: user docs for install, `/lovely-codex`, scoped config, GPT modes,
   apply-patch modes, Codex CLI requirement, and related Lovely Pi projects footer.
-- `docs/APPLY_PATCH_REPORT.md`: source-level notes from Pi `apply_patch`
-  review in `pi-codex-conversion`; reference for possible native impl.
