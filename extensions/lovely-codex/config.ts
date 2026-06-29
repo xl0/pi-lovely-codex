@@ -1,4 +1,4 @@
-import { type ConfigFromSchema, type ConfigScope, defineScopedConfig, field, type ScopedConfig } from "@xl0/pi-lovely-config"
+import { type ConfigFromSchema, defineScopedConfig, field } from "@xl0/pi-lovely-config"
 
 export const CONFIG_FILE_NAME = "xl0-pi-lovely-codex.json"
 
@@ -27,6 +27,3 @@ export const codexConfigSpec = defineScopedConfig({
 	fileName: CONFIG_FILE_NAME,
 	schema: codexConfigSchema
 })
-
-export type { ConfigScope }
-export type ScopedCodexConfig = ScopedConfig<CodexConfig>["scoped"]

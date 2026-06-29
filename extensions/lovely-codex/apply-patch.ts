@@ -17,14 +17,14 @@ const ApplyPatchParams = Type.Object({
 	input: Type.String({ description: "Patch text wrapped in *** Begin Patch / *** End Patch" })
 })
 
-export interface ApplyPatchCommandResult {
+interface ApplyPatchCommandResult {
 	exitCode: number
 	stdout: string
 	stderr: string
 	output: string
 }
 
-export interface ApplyPatchToolDetails extends ApplyPatchCommandResult {
+interface ApplyPatchToolDetails extends ApplyPatchCommandResult {
 	diff?: string
 	patch?: string
 	firstChangedLine?: number
@@ -36,10 +36,6 @@ interface FileSnapshot {
 	path: string
 	exists: boolean
 	content?: string
-}
-
-export function buildApplyPatchOutput(stdout: string, stderr: string): string {
-	return `${stdout}${stderr}`
 }
 
 function readTextContent(result: { content: Array<{ type: string; text?: string }> }): string {
@@ -100,17 +96,17 @@ function readSnapshot(cwd: string, path: string): FileSnapshot {
 }
 
 function buildDiff(before: FileSnapshot[], after: FileSnapshot[]): Pick<ApplyPatchToolDetails, "diff" | "patch" | "firstChangedLine"> {
-	const changedDiffs: { path: string; diff: string }[] = []
+	const changedDiffs: { path: string; diff: string; oldContent: string; newContent: string }[] = []
 	let firstChangedLine: number | undefined
 
-	for (const oldFile of before) {
-		const newFile = after.find(file => file.path === oldFile.path)
+	for (const [index, oldFile] of before.entries()) {
+		const newFile = after[index]
 		if (!newFile || (oldFile.exists === newFile.exists && oldFile.content === newFile.content)) continue
 		if (oldFile.content === undefined || newFile.content === undefined) continue
 
 		const diff = generateDiffString(oldFile.content, newFile.content)
 		if (diff.diff) {
-			changedDiffs.push({ path: oldFile.path, diff: diff.diff })
+			changedDiffs.push({ path: oldFile.path, diff: diff.diff, oldContent: oldFile.content, newContent: newFile.content })
 			firstChangedLine ??= diff.firstChangedLine
 		}
 	}
@@ -122,12 +118,7 @@ function buildDiff(before: FileSnapshot[], after: FileSnapshot[]): Pick<ApplyPat
 	const result: Pick<ApplyPatchToolDetails, "diff" | "patch" | "firstChangedLine"> = {
 		diff: diffParts.join("\n"),
 		patch: changedDiffs
-			.map(file => {
-				const oldFile = before.find(snapshot => snapshot.path === file.path)
-				const newFile = after.find(snapshot => snapshot.path === file.path)
-				if (oldFile?.content === undefined || newFile?.content === undefined) return ""
-				return generateUnifiedPatch(file.path, oldFile.content, newFile.content)
-			})
+			.map(file => generateUnifiedPatch(file.path, file.oldContent, file.newContent))
 			.filter(Boolean)
 			.join("\n")
 	}
@@ -145,7 +136,7 @@ async function withTouchedFileMutationQueues<T>(cwd: string, touchedPaths: strin
 	return queued()
 }
 
-export async function runCodexApplyPatch(cwd: string, input: string): Promise<ApplyPatchCommandResult> {
+async function runCodexApplyPatch(cwd: string, input: string): Promise<ApplyPatchCommandResult> {
 	return new Promise((resolve, reject) => {
 		const child = spawn("codex", ["--codex-run-as-apply-patch", input], {
 			cwd,
@@ -161,17 +152,18 @@ export async function runCodexApplyPatch(cwd: string, input: string): Promise<Ap
 		})
 		child.on("error", reject)
 		child.on("close", code => {
+			const output = `${stdout}${stderr}`
 			resolve({
 				exitCode: code ?? 1,
 				stdout,
 				stderr,
-				output: buildApplyPatchOutput(stdout, stderr)
+				output
 			})
 		})
 	})
 }
 
-export const applyPatchTool = defineTool({
+const applyPatchTool = defineTool({
 	name: "apply_patch",
 	label: "apply_patch",
 	description:
