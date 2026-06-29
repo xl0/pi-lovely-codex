@@ -1,6 +1,6 @@
 import { type ConfigFromSchema, defineScopedConfig, field } from "@xl0/pi-lovely-config"
 
-export const CONFIG_FILE_NAME = "xl0-pi-lovely-codex.json"
+const CONFIG_FILE_NAME = "xl0-pi-lovely-codex.json"
 
 const codexConfigSchema = {
 	gptMode: field.enum(["default", "fast", "fast-codex"], "default", {

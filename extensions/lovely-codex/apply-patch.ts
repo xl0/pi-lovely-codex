@@ -13,10 +13,6 @@ import {
 import { Container, Spacer, Text } from "@earendil-works/pi-tui"
 import { Type } from "typebox"
 
-const ApplyPatchParams = Type.Object({
-	input: Type.String({ description: "Patch text wrapped in *** Begin Patch / *** End Patch" })
-})
-
 interface ApplyPatchCommandResult {
 	exitCode: number
 	stdout: string
@@ -177,7 +173,9 @@ const applyPatchTool = defineTool({
 		"apply_patch requires new lines to be prefixed with + when adding a file or adding lines in an update hunk.",
 		"apply_patch file paths must be relative, never absolute."
 	],
-	parameters: ApplyPatchParams,
+	parameters: Type.Object({
+		input: Type.String({ description: "Patch text wrapped in *** Begin Patch / *** End Patch" })
+	}),
 	executionMode: "sequential",
 	renderCall(args, theme, context) {
 		const input = typeof args?.input === "string" ? args.input : ""
