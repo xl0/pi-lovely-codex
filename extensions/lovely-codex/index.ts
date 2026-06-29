@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent"
-import { type ResolvedConfig, ScopedConfigEditor } from "@xl0/pi-lovely-config"
+import { ScopedConfigEditor } from "@xl0/pi-lovely-config"
 import { registerApplyPatchTool } from "./apply-patch.js"
 import { type CodexConfig, codexConfigSpec } from "./config.js"
 import { registerGptModeHooks } from "./gpt-mode.js"
@@ -9,7 +9,7 @@ function isGptModel(model: ExtensionContext["model"]): boolean {
 }
 
 export default function lovelyCodexExtension(pi: ExtensionAPI) {
-	let configValue: ResolvedConfig<CodexConfig> = codexConfigSpec.defaults
+	let configValue: CodexConfig = codexConfigSpec.defaults
 	let editToolBaseline = new Set<string>()
 	let selectedModelIsGpt = false
 	const getConfig = <Key extends keyof CodexConfig & string>(key: Key) => configValue[key]
@@ -39,7 +39,7 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 		configValue = loaded.value
 		notifyConfigWarnings(ctx, loaded.warnings)
 	}
-	const setConfig = (value: ResolvedConfig<CodexConfig>, ctx: ExtensionContext) => {
+	const setConfig = (value: CodexConfig, ctx: ExtensionContext) => {
 		configValue = value
 		applyToolConfig()
 		updateStatus(ctx)
