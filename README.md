@@ -64,7 +64,8 @@ Workspace overrides User. All keys are optional.
 | [Pi Lovely Dev Tools](https://github.com/xl0/pi-lovely-dev-tools) | interactive debugging helpers `/tool`, `/show-sysprompt`, `/show-context`, `/llm-stats` |
 | [Pi Lovely IDE](https://github.com/xl0/pi-lovely-ide) | IDE integration |
 | [Pi Lovely Config](https://github.com/xl0/pi-lovely-config) | scoped config helpers for Pi extensions |
-
+| [Pi Lovely Comment](https://github.com/xl0/agent-files/tree/master/pi/packages/pi-lovely-comment) | open the last assistant message in your editor and sync edits back into the prompt |
+| [Pi Lovely Rename](https://github.com/xl0/agent-files/tree/master/pi/packages/pi-lovely-rename) | automatic and manual session naming |
 ---
 
 Like this work? [Hire me](https://alexey.work/cv?ref=pi-lovely-codex)
