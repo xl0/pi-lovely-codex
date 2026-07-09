@@ -33,6 +33,8 @@ but often make silly mistakes that might be just muscle memory from being traine
 
 This extension adds the tool GPT models crave so much.
 
+On Pi versions with freeform-tool support, `apply_patch` is sent as an OpenAI custom tool constrained by Codex's Lark grammar. Other models/providers fall back to the JSON tool shape `{ input: string }`.
+
 > Note: Current `apply_patch` implementation shells out to `codex --codex-run-as-apply-patch`. **You need to have codex installed and available on PATH.**
 
 `add apply_patch` controls whether Lovely Codex enables the `apply_patch` tool:

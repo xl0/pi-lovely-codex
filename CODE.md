@@ -213,6 +213,11 @@ Tool schema:
 { input: string }
 ```
 
+For models/providers supporting OpenAI grammar tools, the tool is emitted as a
+freeform custom tool constrained by Codex's apply-patch Lark grammar. Pi maps
+the streamed freeform body back to `input`. Unsupported providers fall back to
+the JSON tool schema above.
+
 Prompt describes Codex apply-patch format:
 
 - full `*** Begin Patch` / `*** End Patch` envelope required
@@ -271,7 +276,8 @@ No automated tests are currently kept in this package.
 ## Tooling and docs
 
 - `tsconfig.json`: strict TypeScript for `extensions/`.
-- `biome.json`: formatter/linter config aligned with adjacent Pi Lovely packages.
+- `biome.json`: formatter/linter config aligned with adjacent Pi Lovely packages;
+  references the installed Biome package schema and uses the recommended rules preset.
 - lockfiles are ignored; package scripts run through Bun.
 - `README.md`: user docs for install, `/lovely-codex`, scoped config, GPT modes,
   apply-patch modes, Codex CLI requirement, and related Lovely Pi projects footer.
