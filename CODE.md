@@ -216,7 +216,9 @@ Tool schema:
 For models/providers supporting OpenAI grammar tools, the tool is emitted as a
 freeform custom tool constrained by Codex's apply-patch Lark grammar. Pi maps
 the streamed freeform body back to `input`. Unsupported providers fall back to
-the JSON tool schema above.
+the JSON tool schema above. Registration refreshes on session start and model
+selection so the tool description matches the selected model's declared grammar
+tool support.
 
 Prompt describes Codex apply-patch format:
 
