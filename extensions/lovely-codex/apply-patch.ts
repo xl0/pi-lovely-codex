@@ -34,6 +34,10 @@ interface FileSnapshot {
 	content?: string
 }
 
+const JSON_DESCRIPTION =
+	"Use the `apply_patch` tool to edit files using Codex apply_patch format. Pass a single `input` string containing the full patch envelope starting with *** Begin Patch and ending with *** End Patch."
+const FREEFORM_DESCRIPTION = "Use the `apply_patch` tool to edit files. This is a FREEFORM tool, so do not wrap the patch in JSON."
+
 function readTextContent(result: { content: Array<{ type: string; text?: string }> }): string {
 	return result.content
 		.map(block => (block.type === "text" ? block.text : undefined))
@@ -163,8 +167,7 @@ async function runCodexApplyPatch(cwd: string, input: string): Promise<ApplyPatc
 const applyPatchTool = defineTool({
 	name: "apply_patch",
 	label: "apply_patch",
-	description:
-		"Use the `apply_patch` tool to edit files using Codex apply_patch format. Provide the full patch envelope starting with *** Begin Patch and ending with *** End Patch.",
+	description: JSON_DESCRIPTION,
 	promptSnippet: "Use apply_patch to edit files via Codex apply_patch format",
 	promptGuidelines: [
 		"Use apply_patch for text-file changes, including creates, deletes, and moves; group related multi-file edits into one patch.",
@@ -276,8 +279,11 @@ eof_line: "*** End of File" LF
 	}
 })
 
-export function registerApplyPatchTool(pi: ExtensionAPI) {
-	pi.registerTool(applyPatchTool)
+export function registerApplyPatchTool(pi: ExtensionAPI): (supportsFreeform: boolean) => void {
+	const register = (supportsFreeform: boolean) => {
+		pi.registerTool({ ...applyPatchTool, description: supportsFreeform ? FREEFORM_DESCRIPTION : JSON_DESCRIPTION })
+	}
+	register(false)
 	pi.on("tool_result", event => {
 		if (event.toolName !== "apply_patch") return undefined
 		const details = failureDetails.get(event.toolCallId)
@@ -285,4 +291,5 @@ export function registerApplyPatchTool(pi: ExtensionAPI) {
 		failureDetails.delete(event.toolCallId)
 		return { details }
 	})
+	return register
 }

@@ -8,10 +8,15 @@ function isGptModel(model: ExtensionContext["model"]): boolean {
 	return model?.id.startsWith("gpt-") || model?.id.includes("/gpt-") || false
 }
 
+function supportsFreeformTools(model: ExtensionContext["model"]): boolean {
+	return model?.compat !== undefined && "supportsGrammarTools" in model.compat && model.compat.supportsGrammarTools === true
+}
+
 export default function lovelyCodexExtension(pi: ExtensionAPI) {
 	let configValue: CodexConfig = codexConfigSpec.defaults
 	let editToolBaseline = new Set<string>()
 	let selectedModelIsGpt = false
+	const updateApplyPatchTool = registerApplyPatchTool(pi)
 	const getMode = () => configValue.gptMode
 	const applyToolConfig = () => {
 		const addMode = configValue.applyPatchAddMode
@@ -48,6 +53,7 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 		try {
 			editToolBaseline = new Set(pi.getActiveTools())
 			selectedModelIsGpt = isGptModel(ctx.model)
+			updateApplyPatchTool(supportsFreeformTools(ctx.model))
 			loadConfig(ctx)
 		} catch (error) {
 			configValue = codexConfigSpec.defaults
@@ -59,6 +65,7 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 
 	pi.on("model_select", async event => {
 		selectedModelIsGpt = isGptModel(event.model)
+		updateApplyPatchTool(supportsFreeformTools(event.model))
 		applyToolConfig()
 	})
 
@@ -89,7 +96,6 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 		}
 	})
 	registerGptModeHooks(pi, getMode)
-	registerApplyPatchTool(pi)
 }
 
 function notifyConfigWarnings(ctx: ExtensionContext, warnings: ReturnType<typeof codexConfigSpec.load>["warnings"]): void {
