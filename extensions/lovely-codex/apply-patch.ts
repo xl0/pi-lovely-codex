@@ -164,7 +164,7 @@ const applyPatchTool = defineTool({
 	name: "apply_patch",
 	label: "apply_patch",
 	description:
-		"Use the `apply_patch` tool to edit files using Codex apply_patch format. Pass a single `input` string containing the full patch envelope starting with *** Begin Patch and ending with *** End Patch.",
+		"Use the `apply_patch` tool to edit files using Codex apply_patch format. Provide the full patch envelope starting with *** Begin Patch and ending with *** End Patch.",
 	promptSnippet: "Use apply_patch to edit files via Codex apply_patch format",
 	promptGuidelines: [
 		"Use apply_patch for text-file changes, including creates, deletes, and moves; group related multi-file edits into one patch.",
@@ -177,6 +177,33 @@ const applyPatchTool = defineTool({
 	parameters: Type.Object({
 		input: Type.String({ description: "Patch text wrapped in *** Begin Patch / *** End Patch" })
 	}),
+	...({
+		constrainedSampling: {
+			type: "grammar",
+			variants: {
+				openai_lark: `start: begin_patch hunk+ end_patch
+begin_patch: "*** Begin Patch" LF
+end_patch: "*** End Patch" LF?
+
+hunk: add_hunk | delete_hunk | update_hunk
+add_hunk: "*** Add File: " filename LF add_line+
+delete_hunk: "*** Delete File: " filename LF
+update_hunk: "*** Update File: " filename LF change_move? change?
+
+filename: /(.+)/
+add_line: "+" /(.*)/ LF -> line
+
+change_move: "*** Move to: " filename LF
+change: (change_context | change_line)+ eof_line?
+change_context: ("@@" | "@@ " /(.+)/) LF
+change_line: ("+" | "-" | " ") /(.*)/ LF
+eof_line: "*** End of File" LF
+
+%import common.LF
+`
+			}
+		}
+	} as const),
 	executionMode: "sequential",
 	renderCall(args, theme, context) {
 		const input = typeof args?.input === "string" ? args.input : ""

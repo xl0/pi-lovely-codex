@@ -11,6 +11,7 @@
 - File-editing tool exposure is split: `applyPatchAddMode` (`on`/`off`/`gpt-only`, default `gpt-only`) controls adding `apply_patch`; `disableWrite`/`disableEdit` booleans (default `false`) remove baseline `write`/`edit` only while `apply_patch` is active. Config is scoped like `gptMode`.
 - Scoped config helper comes from `@xl0/pi-lovely-config`; local development overrides it with `bun link @xl0/pi-lovely-config`.
 - `apply_patch` delegates semantics to Codex CLI; no native implementation is planned.
+- `apply_patch` uses Codex's Lark grammar as a freeform OpenAI custom tool when supported; Pi falls back to its `{ input: string }` function schema otherwise.
 
 ## Todo
 - [x] Add package manifest and Pi extension entry.
