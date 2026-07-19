@@ -170,12 +170,7 @@ const applyPatchTool = defineTool({
 	description: JSON_DESCRIPTION,
 	promptSnippet: "Use apply_patch to edit files via Codex apply_patch format",
 	promptGuidelines: [
-		"Use apply_patch for text-file changes, including creates, deletes, and moves; group related multi-file edits into one patch.",
-		"apply_patch can combine several file operations: Add File, Update File, Delete File, and Move to.",
-		"apply_patch input must include full patch envelope with *** Begin Patch and *** End Patch.",
-		"apply_patch input must include one or more file sections; each section starts with *** Add File:, *** Update File:, or *** Delete File:.",
-		"apply_patch requires new lines to be prefixed with + when adding a file or adding lines in an update hunk.",
-		"apply_patch file paths must be relative, never absolute."
+		"apply_patch Multi-file edits are not encouraged: prefer smaller patches that touch one file, split large edits to one file into multiple consecutive patches."
 	],
 	parameters: Type.Object({
 		input: Type.String({ description: "Patch text wrapped in *** Begin Patch / *** End Patch" })

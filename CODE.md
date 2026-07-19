@@ -222,11 +222,10 @@ tool support.
 
 Prompt describes Codex apply-patch format:
 
-- full `*** Begin Patch` / `*** End Patch` envelope required
-- supports add/update/delete/move operations
-- supports multi-file/multi-hunk patches
-- new lines in hunks must use `+`
-- file paths must be relative
+- models are expected to know syntax; constrained-tool grammar defines its
+  structure instead of duplicating it in prompt guidelines
+- multi-file patches are supported, but models are prompted to prefer smaller
+  patches because an early failure invalidates the remainder
 
 Execution:
 
