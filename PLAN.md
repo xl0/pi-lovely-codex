@@ -23,6 +23,7 @@
 - [x] Extract internal schema-driven scoped config helper and port `/lovely-codex`.
 - [x] Show a warning when scoped config JSON/type is invalid and ignored.
 - [x] Link local `@xl0/pi-lovely-config` package with `bun link` and import scoped config helpers from it.
+- [x] Disable cmux Codex session hooks for internal `apply_patch` subprocesses.
 
 ## Scoped config helper extraction
 
