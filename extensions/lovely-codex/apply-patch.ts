@@ -136,6 +136,7 @@ async function runCodexApplyPatch(cwd: string, input: string): Promise<ApplyPatc
 	return new Promise((resolve, reject) => {
 		const child = spawn("codex", ["--codex-run-as-apply-patch", input], {
 			cwd,
+			env: { ...process.env, CMUX_CODEX_HOOKS_DISABLED: "1" },
 			stdio: ["ignore", "pipe", "pipe"]
 		})
 		let stdout = ""

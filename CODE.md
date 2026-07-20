@@ -226,7 +226,9 @@ Execution:
 1. parse touched paths from patch envelope
 2. acquire Pi file mutation queues for touched files in sorted absolute-path order
 3. snapshot touched files before run when possible
-4. spawn `codex --codex-run-as-apply-patch <input>` in `ctx.cwd`
+4. spawn `codex --codex-run-as-apply-patch <input>` in `ctx.cwd` with
+   `CMUX_CODEX_HOOKS_DISABLED=1` so terminal wrappers cannot inject session
+   arguments into Codex's internal apply-patch entrypoint
 5. snapshot touched files after run when possible
 6. build edit-like result metadata and rendered diff
 
