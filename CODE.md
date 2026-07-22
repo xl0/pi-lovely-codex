@@ -2,283 +2,135 @@
 
 ## Role
 
-Pi package adding Codex-oriented controls to the coding agent:
+Pi extension adding Codex-oriented controls to the coding agent:
 
 - choose GPT service-tier behavior per user/workspace
-- expose Codex-compatible `apply_patch`
-- control file-editing tools per user/workspace
+- expose a Codex-compatible `apply_patch` tool
+- control which file-editing tools are active
 
-State below describes current codebase, not history.
+State below describes the current codebase, not history.
 
-## Package shape
+## Layout
 
-- `package.json` publishes `@xl0/pi-lovely-codex` as ESM.
-- Package metadata includes MIT license, xl0 author/publisher, GitHub homepage,
-  repository, issue tracker, and Bun package manager.
-- Pi loads extension entrypoints from `./extensions` via `pi.extensions`.
-- Published files: `extensions/`, `README.md`, `LICENSE`.
-- Runtime deps: `@xl0/pi-lovely-config` plus `typebox`.
-- Peer deps: Pi agent/AI/TUI packages.
-- Dev deps: TypeScript/native preview and Biome.
-- Main scripts:
-  - `typecheck`: `tsgo --noEmit`
-  - `check`: typecheck + Biome check
+`extensions/lovely-codex/` is the whole implementation:
 
-## Config model
+- `index.ts`: extension entrypoint, lifecycle, `/lovely-codex` command
+- `config.ts`: scoped config spec
+- `gpt-mode.ts`: service-tier request hooks and cost adjustment
+- `apply-patch.ts`: the `apply_patch` tool
 
-Implemented in `extensions/lovely-codex/config.ts` as private `codexConfigSchema`
-plus exported `codexConfigSpec = defineScopedConfig(...)`.
-`CodexConfig` is the effective value shape derived from field schema with
-`ConfigFromSchema`. Loaded scoped patches live on `codexConfigSpec.scoped` as
-raw per-scope records so unknown/invalid file values can survive load/save.
-Field builders drive runtime schema/defaults/UI and static config typing.
+Published as ESM `@xl0/pi-lovely-codex`; Pi discovers entrypoints via
+`pi.extensions`. Runtime dep `@xl0/pi-lovely-config` (plus typebox); Pi packages
+are peer deps. No automated tests.
 
-Config schema:
+## Config
 
-```json
-{
-  "gptMode": "default | fast | fast-codex",
-  "applyPatchAddMode": "on | off | gpt-only",
-  "disableWrite": "boolean",
-  "disableEdit": "boolean"
-}
-```
+`config.ts` defines `codexConfigSpec = defineScopedConfig(...)` over four flat
+optional fields:
 
-All persisted fields are optional. Omitted means unset in that scope.
+| field | values | default |
+| --- | --- | --- |
+| `gptMode` | `default` / `fast` / `fast-codex` | `default` |
+| `applyPatchAddMode` | `on` / `off` / `gpt-only` | `gpt-only` |
+| `disableWrite` | boolean | `false` |
+| `disableEdit` | boolean | `false` |
 
-Defaults after scope merge, exposed as `codexConfigSpec.defaults`:
+Scopes are User (`~/.pi/agent/xl0-pi-lovely-codex.json`) and Workspace
+(`<cwd>/.pi/...`); Workspace shallow-overrides User. Omitted means unset in
+that scope, not "false".
 
-- `gptMode`: `default`
-- `applyPatchAddMode`: `gpt-only`
-- `disableWrite`: `false`
-- `disableEdit`: `false`
+Non-obvious behavior, all owned by `@xl0/pi-lovely-config`:
 
-Scopes:
+- Defaults live on field builders and are never persisted.
+- Unknown file properties survive load/save and reset; only known keys are
+  written or deleted. A scope file is removed when it becomes empty.
+- Invalid *known* values warn and are ignored while resolving; invalid JSON or
+  a non-object file is a hard error naming the path.
+- IO is synchronous and stateful — the spec instance holds raw scoped patches.
 
-- user: `${getAgentDir()}/xl0-pi-lovely-codex.json` (default `~/.pi/agent/...`)
-- workspace: `<cwd>/${CONFIG_DIR_NAME}/xl0-pi-lovely-codex.json` (default `<cwd>/.pi/...`)
+## Lifecycle
 
-Workspace overrides user through shallow merge:
+`lovelyCodexExtension(pi)` keeps three pieces of process-local state: the
+effective config, a baseline of tools active at `session_start`, and whether
+the selected model is GPT.
 
-```ts
-{ ...user, ...workspace }
-```
+`session_start` captures the baseline, refreshes the `apply_patch` registration
+for the model, loads/merges both scopes for `cwd`, applies tool activation and
+sets the status indicator. Any failure falls back to defaults, clears status,
+and notifies. `model_select` re-runs the model-dependent parts.
 
-Config IO is sync through stateful `@xl0/pi-lovely-config` config instances.
-Missing files load as `{}` for that scope.
-Invalid JSON or non-object config files throw a diagnostic error with the file
-path.
-Invalid known values produce warnings and are ignored while resolving.
-Unknown file properties are preserved across load/save but ignored by resolved
-typed behavior.
-Resetting a scope deletes known keys in that scope, preserves unknown keys, and
-removes the file if empty.
+Status indicator is `🏎️` (accent) for non-`default` GPT modes, hidden otherwise.
 
-## Extension lifecycle
+## Tool activation
 
-Implemented in `extensions/lovely-codex/index.ts`.
+`applyToolConfig()` rewrites Pi's active tool set from config + model:
 
-Entrypoint `lovelyCodexExtension(pi)` owns process-local state:
+- `apply_patch` present when mode is `on`, or `gpt-only` and the model id
+  starts with `gpt-` or contains `/gpt-`
+- `disableWrite` / `disableEdit` remove `write` / `edit`, but *only while
+  `apply_patch` is active*; otherwise they are restored
 
-- `configValue`: default-filled effective config
-- `editToolBaseline`: active tool set captured at session start
-- `selectedModelIsGpt`: current model GPT-ness for `gpt-only` apply-patch mode
-
-On `session_start`:
-
-1. capture active tools as baseline
-2. load and merge both config scopes for current `cwd`
-3. apply tool config to active tools
-4. update `lovely-codex` status indicator
-
-If config loading fails due to an unreadable file or other IO error:
-
-- config resets to empty scopes/defaults
-- tool config applies defaults
-- status clears
-- UI shows error notification keyed by config filename
-
-Registered features:
-
-- `/lovely-codex` command
-- GPT mode request/message hooks
-- `apply_patch` tool
-
-Status indicator:
-
-- hidden for `gptMode=default`
-- `🏎️` in accent color for `fast` or `fast-codex`
-
-## Tool activation semantics
-
-`applyToolConfig()` mutates Pi active tools from maintained effective config and selected model state.
-
-- `applyPatchAddMode=on`: add `apply_patch`
-- `applyPatchAddMode=off`: remove `apply_patch`
-- `applyPatchAddMode=gpt-only`: add `apply_patch` only when current model id
-  starts with `gpt-` or contains `/gpt-`; model changes reapply tool config
-- `disableWrite=true`: remove `write` while `apply_patch` is active;
-  otherwise restore it only if present in session-start baseline
-- `disableEdit=true`: remove `edit` while `apply_patch` is active;
-  otherwise restore it only if present in session-start baseline
-
-Baseline prevents extension from enabling tools that were not active before it ran.
-
-## Scoped config helper
-
-Imported from `@xl0/pi-lovely-config`; during local development it is overridden
-with `bun link @xl0/pi-lovely-config`.
-
-Used exports:
-
-- `defineScopedConfig({ fileName, schema })`: validates field schema and returns a stateful config instance with defaults, scoped IO, scoped updates, and reset
-- `field.enum()`, `field.boolean()`: build this extension's supported fields
-- `ConfigFromSchema<Schema>`: derives resolved config object type from schema
-- `ScopedConfigEditor`: reusable scoped TUI config editor component.
-
-Lovely Codex currently uses `enum` and `boolean` fields.
-Persisted keys are flat; optional field `depth` controls UI indentation only.
-Defaults originate on fields, are written into generated schema, are exposed through the config instance, and are used for resolved config, UI notes, and visibility; defaults are not persisted.
-`visibleWhen` reads default-filled effective config through `get()` and can read scoped values through `getScoped()`.
-Hidden fields stay persisted/effective.
-Enum defaults are checked against their values at type level and runtime.
-Manual invalid known values warn and are ignored while resolving until fixed.
-Writes are immediate per field cycle; unset deletes only that key.
-Reset deletes known keys from the active scope and preserves unknown keys.
-Caller owns runtime side effects through `onChange(config)`.
+Restoration is gated on the session-start baseline so the extension can never
+enable a tool the session did not already have.
 
 ## `/lovely-codex` command
 
-Registered in `extensions/lovely-codex/index.ts`; scoped config helper only supplies config IO and editor UI.
+TUI-only (ignored in other modes). Reloads config, then hands
+`codexConfigSpec` to `ScopedConfigEditor` from `@xl0/pi-lovely-config`, which
+supplies the tabbed User/Workspace UI, per-field writes, and reset. The
+extension only supplies `onChange`, which re-applies tool activation and
+status. `disableWrite`/`disableEdit` rows are `visibleWhen` `apply_patch` is
+effectively not `off`; hidden fields stay persisted and effective.
 
-Command takes no args and opens a TUI config editor.
-Non-TUI invocation is ignored.
+## GPT mode
 
-UI:
+`gpt-mode.ts` reads the mode through a closure, so command changes take effect
+on later requests.
 
-- tabbed scopes: `User` and `Workspace`
-- rows:
-  - `GPT mode`: `unset`, `default`, `fast`, `fast-codex`
-  - `add apply_patch`: `unset`, `on`, `off`, `gpt-only`
-  - indented sub-options when `apply_patch` is effectively not `off`:
-    - `disable write`: `unset`, `on`, `off`
-    - `disable edit`: `unset`, `on`, `off`
-  - `Reset to default`: separated destructive action; deletes active scope config file
-- notes explain effective value:
-  - workspace override
-  - user inheritance
-  - default fallback
+`before_provider_request` sets `service_tier: "priority"` — for both `openai`
+and `openai-codex` in `fast`, for `openai-codex` only in `fast-codex`, never in
+`default`. Guarded to OpenAI GPT requests (provider `openai`/`openai-codex`,
+model id starting `gpt-`) so other OpenAI-compatible providers are untouched.
 
-Save behavior:
+`message_end` adjusts priority pricing on finalized `openai-codex` assistant
+messages; the plain `openai` provider keeps Pi's native pricing.
 
-- writes only active scope immediately
-- updates the stateful config instance and extension effective config through helper `onChange`
-- reapplies tool activation
-- updates status indicator
-- reset clears known active-scope keys, preserves unknown keys, then reapplies state
+Verified 2026-07-21: Codex subscription backend accepts `service_tier:
+"priority"` but processes at default tier (response echoes `default`, no
+throughput gain) unless the account has Fast mode credits — the `message_end`
+multiplier then inflates displayed cost. API-key `openai` honors `priority`
+(echoed on every request, measurable latency gains on most models).
 
-Manual invalid known values show warnings and are ignored while resolving.
-Invalid JSON or non-object config files show an error and the command does not
-open until the file is fixed.
+## `apply_patch`
 
-## GPT mode hooks
+`apply-patch.ts`. Schema is `{ input: string }`, but when the model declares
+grammar-tool support the tool is instead emitted as a freeform custom tool
+constrained by Codex's apply-patch Lark grammar, with Pi mapping the streamed
+body back to `input`. Registration is refreshed on session start and model
+select so description and shape match the model.
 
-Implemented in `extensions/lovely-codex/gpt-mode.ts`.
+The prompt deliberately does not restate the patch syntax (models know it, and
+the grammar encodes it); it does push for smaller patches, since an early
+hunk failure invalidates the rest of a multi-file patch.
 
-Applies only to OpenAI GPT requests:
+Execution parses touched paths from the envelope, acquires Pi's file mutation
+queues in sorted absolute-path order, snapshots before/after, and shells out to
+`codex --codex-run-as-apply-patch <input>` in `ctx.cwd`, with
+`CMUX_CODEX_HOOKS_DISABLED=1` to prevent terminal wrappers injecting session
+arguments. Semantics are delegated to the Codex CLI; no native parser is
+planned.
 
-- provider: `openai` or `openai-codex`
-- model id starts with `gpt-`
+Success returns `stdout + stderr`. Failure throws the combined output plus a
+partial-change diff when one exists — the thrown text is what the LLM sees,
+while a `tool_result` hook attaches the captured command details for the UI.
 
-`before_provider_request` behavior:
-
-- `default`: do not send `service_tier`
-- `fast`: set `service_tier: "priority"` for both providers
-- `fast-codex`: set priority only for `openai-codex`
-
-`message_end` behavior:
-
-- checks current mode at message end
-- adjusts priority cost for `openai-codex` assistant messages
-
-Mode is read through closure, so command changes affect later requests.
-
-## `apply_patch` tool
-
-Implemented in `extensions/lovely-codex/apply-patch.ts`.
-
-Tool schema:
-
-```ts
-{ input: string }
-```
-
-For models/providers supporting OpenAI grammar tools, the tool is emitted as a
-freeform custom tool constrained by Codex's apply-patch Lark grammar. Pi maps
-the streamed freeform body back to `input`. Unsupported providers fall back to
-the JSON tool schema above. Registration refreshes on session start and model
-selection so the tool description matches the selected model's declared grammar
-tool support.
-
-Prompt describes Codex apply-patch format:
-
-- models are expected to know syntax; constrained-tool grammar defines its
-  structure instead of duplicating it in prompt guidelines
-- multi-file patches are supported, but models are prompted to prefer smaller
-  patches because an early failure invalidates the remainder
-
-Execution:
-
-1. parse touched paths from patch envelope
-2. acquire Pi file mutation queues for touched files in sorted absolute-path order
-3. snapshot touched files before run when possible
-4. spawn `codex --codex-run-as-apply-patch <input>` in `ctx.cwd` with
-   `CMUX_CODEX_HOOKS_DISABLED=1` so terminal wrappers cannot inject session
-   arguments into Codex's internal apply-patch entrypoint
-5. snapshot touched files after run when possible
-6. build edit-like result metadata and rendered diff
-
-Success returns combined `stdout + stderr` as tool text.
-
-Failure throws combined output plus partial-change diff when available.
-
-Raw result metadata kept:
-
-- `exitCode`
-- `stdout`
-- `stderr`
-- `output`
-
-Edit-style details kept for Pi UI:
-
-- `diff`
-- unified `patch`
-- `firstChangedLine`
-
-TUI behavior:
-
-- call line highlights touched filenames like `edit`
-- while the tool call/result is pending, call render shows streamed `input`
-  with lightweight apply-patch diff coloring
-- result renders line-numbered diffs through Pi `renderDiff`
-- failures keep thrown error text as LLM tool-result content, while a `tool_result`
-  hook attaches captured command details for UI rendering
-- failure UI renders raw combined output, then line-numbered partial-change
-  diffs when available
-- filename headers are prefixed only for multi-file diffs
-
-Current impl delegates semantics to Codex CLI instead of native patch parser.
-No native implementation is currently planned.
-
-## Tests
-
-No automated tests are currently kept in this package.
+TUI rendering mirrors `edit`: touched filenames highlighted on the call line,
+streamed `input` shown with lightweight diff coloring while pending, and
+line-numbered diffs via Pi `renderDiff` on completion. Filename headers appear
+only for multi-file diffs.
 
 ## Tooling and docs
 
-- `tsconfig.json`: strict TypeScript for `extensions/`.
-- `biome.json`: formatter/linter config aligned with adjacent Pi Lovely packages;
-  references the installed Biome package schema and uses the recommended rules preset.
-- lockfiles are ignored; package scripts run through Bun.
-- `README.md`: user docs for install, `/lovely-codex`, scoped config, GPT modes,
-  apply-patch modes, Codex CLI requirement, and related Lovely Pi projects footer.
+`tsconfig.json` (strict, over `extensions/`), `biome.json` aligned with the
+adjacent Pi Lovely packages, Bun as package manager, lockfiles ignored.
+`check` = `tsgo --noEmit` + Biome. `README.md` carries the user-facing docs.
