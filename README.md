@@ -8,7 +8,7 @@ GPT "Fast mode" control and Codex-style `apply_patch` tool.
 pi install npm:@xl0/pi-lovely-codex
 ```
 
-Use without install:
+Or use without installing:
 
 ```bash
 pi -e npm:@xl0/pi-lovely-codex
@@ -20,43 +20,45 @@ pi -e npm:@xl0/pi-lovely-codex
 
 ### GPT fast mode 🏎️
 
-- `default` -> omit `service_tier` - default mode
-- `fast` -> send `service_tier: "priority"` for `openai` and `openai-codex` - request fast mode on OpenAI API and Codex sub.
-- `fast-codex` -> send priority only for `openai-codex` - request fast mode on Codex sub only.
+Sends `service_tier: "priority"` to request priority serving:
 
-Applies only to provider `openai` or `openai-codex`, model id starting with `gpt-`. Fast mode shows `🏎️` in status line.
+- `default` — don't send `service_tier`
+- `fast` — priority on both `openai` and `openai-codex`
+- `fast-codex` — priority on `openai-codex` only
 
-### apply_patch tool
+GPT models on those two providers only. Fast mode shows 🏎️ in the status line.
 
-GPT models have been relentlessly fine-tuned to use the `apply_patch` tool in Codex. They can use the default Pi `edit` tool of course,
-but often make silly mistakes that might be just muscle memory from being trained on `apply_patch` for the edit task.
+> On the Codex subscription, `priority` is silently ignored unless your account
+> has Fast mode credits. On the OpenAI API it needs priority processing enabled
+> for your org.
 
-This extension adds the tool GPT models crave so much.
+### `apply_patch`
 
-On Pi versions with freeform-tool support, `apply_patch` is sent as an OpenAI custom tool constrained by Codex's Lark grammar. Other models/providers fall back to the JSON tool shape `{ input: string }`.
+GPT models are trained on Codex's `apply_patch`; with Pi's `edit` tool, muscle
+memory shows — silly mistakes creep in. This extension gives them the tool they
+were trained on.
 
-> Note: Current `apply_patch` implementation shells out to `codex --codex-run-as-apply-patch`. **You need to have codex installed and available on PATH.**
+On Pi versions with freeform-tool support, `apply_patch` is an OpenAI custom
+tool constrained by Codex's Lark grammar; elsewhere it's a plain JSON tool
+`{ input: string }`.
 
-`add apply_patch` controls whether Lovely Codex enables the `apply_patch` tool:
+> Patches are applied by shelling out to `codex --codex-run-as-apply-patch`.
+> **The Codex CLI must be installed and on PATH.**
 
-- `on` -> always add the `apply_patch` tool.
-- `off` -> don't add the `apply_patch` tool.
-- `gpt-only` -> enable `apply_patch` only when current model id starts with `gpt-` or contains `/gpt-`.
+Settings:
 
-Optionally, you can disable the now redundant built-in tools while `apply_patch` is active:
-- `disable write`
-- `disable edit`
+- `add apply_patch` — `on`, `off`, or `gpt-only` (default: only for model ids
+  starting with `gpt-` or containing `/gpt-`).
+- `disable write` / `disable edit` — drop the now-redundant built-in tools
+  while `apply_patch` is active (off by default); restored after, but never
+  beyond what the session started with.
 
-When `apply_patch` becomes inactive, `write`/`edit` are restored only if they were active at session start.
-
-Default effective values: `add apply_patch = gpt-only`, `disable write = off`, `disable edit = off`.
-
-Config scopes:
+## Config files
 
 - User: `~/.pi/agent/xl0-pi-lovely-codex.json`
 - Workspace: `<cwd>/.pi/xl0-pi-lovely-codex.json`
 
-Workspace overrides User. All keys are optional.
+Workspace overrides User. All keys optional.
 
 ## Related projects
 

@@ -1,48 +1,43 @@
 # Plan
 
-## High-level decisions
-- Package is `@xl0/pi-lovely-codex`.
-- Keep package boilerplate aligned with `pi-lovely-dev-tools` and `pi-lovely-web`.
-- GPT mode config lives in `xl0-pi-lovely-codex.json` under User `~/.pi/agent/` and Workspace `.pi/`; Workspace overrides User. Omitted `gptMode` is unset; effective mode falls through to User or default. Runtime keeps resolved config plus raw scoped patches in memory; command writes only touched keys. Invalid known values warn and are ignored while resolving. Invalid JSON/non-object files are hard config errors.
-- Non-default GPT mode shows `🏎️` in the status line; `default` clears the indicator.
-- GPT modes map to OpenAI service tiers: `default` -> omit service tier, `fast` -> priority for `openai` and `openai-codex`, `fast-codex` -> priority only for `openai-codex`.
-- Apply service-tier payload only to OpenAI GPT models (`provider` `openai`/`openai-codex`, id starts `gpt-`) to avoid breaking other OpenAI-compatible providers.
-- Adjust priority pricing on finalized `openai-codex` assistant messages; normal OpenAI provider responses keep native provider pricing behavior.
-- File-editing tool exposure is split: `applyPatchAddMode` (`on`/`off`/`gpt-only`, default `gpt-only`) controls adding `apply_patch`; `disableWrite`/`disableEdit` booleans (default `false`) remove baseline `write`/`edit` only while `apply_patch` is active. Config is scoped like `gptMode`.
-- Scoped config helper comes from `@xl0/pi-lovely-config`; local development overrides it with `bun link @xl0/pi-lovely-config`.
-- `apply_patch` delegates semantics to Codex CLI; no native implementation is planned.
-- `apply_patch` uses Codex's Lark grammar as a freeform OpenAI custom tool when supported; Pi falls back to its `{ input: string }` function schema otherwise.
+## Intent
+
+`@xl0/pi-lovely-codex` makes Pi behave well against OpenAI Codex models.
+Three things matter, in this order:
+
+1. **Speed on demand.** Let the user pay for OpenAI's priority tier per
+   user/workspace, and either everywhere or only for `openai-codex`. Never
+   touch requests that aren't OpenAI GPT — other OpenAI-compatible providers
+   must be unaffected. Show the user when they're paying for it.
+2. **A real `apply_patch`.** Codex models expect it, so give them the genuine
+   article by delegating to the Codex CLI rather than reimplementing patch
+   semantics. Prefer the grammar-constrained freeform tool where the model
+   supports it. Result rendering should feel like Pi's own `edit`.
+3. **Don't fight the model.** When `apply_patch` is live, let the user hide
+   `write`/`edit` so the model stops reaching for them — but never enable a
+   tool the session didn't already have.
+
+Configuration is scoped (User, Workspace-overrides-User), edited from a single
+no-arg `/lovely-codex` TUI command, and tolerant of files it didn't write:
+unknown keys survive, bad known values warn and fall back, malformed JSON is a
+hard error. The generic half of that lives in `@xl0/pi-lovely-config`, shared
+with the other Lovely packages; this package only owns its field list and the
+runtime side effects.
+
+Keep boilerplate aligned with `pi-lovely-dev-tools` and `pi-lovely-web`.
 
 ## Todo
-- [x] Add package manifest and Pi extension entry.
-- [x] Add TypeScript/Biome tooling config.
-- [x] Add README, LICENSE, `.gitignore`.
-- [x] Add CODE/PLAN docs.
-- [x] Add no-arg `/lovely-codex` tabbed User/Workspace mode config command with unset support.
-- [x] Inject GPT service-tier payload from config.
-- [x] Adjust Codex cost for priority mode.
-- [x] Extract internal schema-driven scoped config helper and port `/lovely-codex`.
-- [x] Show a warning when scoped config JSON/type is invalid and ignored.
-- [x] Link local `@xl0/pi-lovely-config` package with `bun link` and import scoped config helpers from it.
-- [x] Disable cmux Codex session hooks for internal `apply_patch` subprocesses.
 
-## Scoped config helper extraction
+Everything above is implemented and documented in `CODE.md`.
 
-Moved to `../pi-lovely-config/`; this package consumes it through local npm file link.
+- [x] Package, tooling, docs, license.
+- [x] Scoped config + `/lovely-codex` editor, extracted into
+      `@xl0/pi-lovely-config` and consumed via `bun link` during development.
+- [x] GPT service-tier injection and priority cost adjustment.
+- [x] Benchmark Codex-subscription and API-key service tiers across GPT-5.4,
+      5.5, and 5.6 variants; retain raw results, analysis, and chart.
+- [x] `apply_patch` tool, with Lark-grammar freeform variant and JSON fallback.
+- [x] Tool activation from config, gated on session-start baseline.
 
-Current scope:
-
-- fixed User/Workspace scopes
-- shallow merge, Workspace overrides User
-- flat persisted known keys; unknown file properties are preserved across save
-- field `depth` is UI-only
-- field defaults drive resolved config, notes, and visibility, not persisted output
-- this package uses supported field kinds: `enum`, `boolean`
-- field builders derive JSON schema and stateful config objects
-- helper owns config IO, key updates/reset, and reusable TUI editor UI; command registration stays in extension code
-- caller owns runtime side effects via `onChange(config)`
-- immediate writes on field change; unset removes key
-- reset deletes known keys in active scope and preserves unknown keys
-- hidden fields remain persisted/effective
-
-String field UX exists in the shared package; number fields are not used here.
+Nothing open. No native patch implementation is planned; no automated tests
+are kept in this package.
