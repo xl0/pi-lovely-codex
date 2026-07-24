@@ -9,7 +9,7 @@ function isGptModel(model: ExtensionContext["model"]): boolean {
 }
 
 function supportsFreeformTools(model: ExtensionContext["model"]): boolean {
-	return model?.compat !== undefined && "supportsGrammarTools" in model.compat && model.compat.supportsGrammarTools === true
+	return model?.compat !== undefined && "supportsOpenAIGrammarTools" in model.compat && model.compat.supportsOpenAIGrammarTools === true
 }
 
 export default function lovelyCodexExtension(pi: ExtensionAPI) {
