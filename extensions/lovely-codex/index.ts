@@ -16,9 +16,11 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 	let configValue: CodexConfig = codexConfigSpec.defaults
 	let editToolBaseline = new Set<string>()
 	let selectedModelIsGpt = false
+	let selectedModelSupportsFreeform = false
 	const updateApplyPatchTool = registerApplyPatchTool(pi)
 	const getMode = () => configValue.gptMode
 	const applyToolConfig = () => {
+		updateApplyPatchTool(configValue.applyPatchFreeform && selectedModelSupportsFreeform)
 		const addMode = configValue.applyPatchAddMode
 		const hasApplyPatch = addMode === "on" || (addMode === "gpt-only" && selectedModelIsGpt)
 		const active = new Set(pi.getActiveTools())
@@ -53,7 +55,7 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 		try {
 			editToolBaseline = new Set(pi.getActiveTools())
 			selectedModelIsGpt = isGptModel(ctx.model)
-			updateApplyPatchTool(supportsFreeformTools(ctx.model))
+			selectedModelSupportsFreeform = supportsFreeformTools(ctx.model)
 			loadConfig(ctx)
 		} catch (error) {
 			configValue = codexConfigSpec.defaults
@@ -65,7 +67,7 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 
 	pi.on("model_select", async event => {
 		selectedModelIsGpt = isGptModel(event.model)
-		updateApplyPatchTool(supportsFreeformTools(event.model))
+		selectedModelSupportsFreeform = supportsFreeformTools(event.model)
 		applyToolConfig()
 	})
 

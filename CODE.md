@@ -25,13 +25,14 @@ are peer deps. No automated tests.
 
 ## Config
 
-`config.ts` defines `codexConfigSpec = defineScopedConfig(...)` over four flat
+`config.ts` defines `codexConfigSpec = defineScopedConfig(...)` over five flat
 optional fields:
 
 | field | values | default |
 | --- | --- | --- |
 | `gptMode` | `default` / `fast` / `fast-codex` | `default` |
 | `applyPatchAddMode` | `on` / `off` / `gpt-only` | `gpt-only` |
+| `applyPatchFreeform` | boolean | `false` |
 | `disableWrite` | boolean | `false` |
 | `disableEdit` | boolean | `false` |
 
@@ -50,14 +51,14 @@ Non-obvious behavior, all owned by `@xl0/pi-lovely-config`:
 
 ## Lifecycle
 
-`lovelyCodexExtension(pi)` keeps three pieces of process-local state: the
-effective config, a baseline of tools active at `session_start`, and whether
-the selected model is GPT.
+`lovelyCodexExtension(pi)` keeps the effective config, a baseline of tools
+active at `session_start`, whether the selected model is GPT, and whether it
+supports grammar-constrained freeform tools.
 
-`session_start` captures the baseline, refreshes the `apply_patch` registration
-for the model, loads/merges both scopes for `cwd`, applies tool activation and
-sets the status indicator. Any failure falls back to defaults, clears status,
-and notifies. `model_select` re-runs the model-dependent parts.
+`session_start` captures the baseline and model capabilities, loads/merges both
+scopes for `cwd`, refreshes the `apply_patch` registration, applies tool
+activation and sets the status indicator. Any failure falls back to defaults,
+clears status, and notifies. `model_select` re-runs the model-dependent parts.
 
 Status indicator is `🏎️` (accent) for non-`default` GPT modes, hidden otherwise.
 
@@ -78,9 +79,10 @@ enable a tool the session did not already have.
 TUI-only (ignored in other modes). Reloads config, then hands
 `codexConfigSpec` to `ScopedConfigEditor` from `@xl0/pi-lovely-config`, which
 supplies the tabbed User/Workspace UI, per-field writes, and reset. The
-extension only supplies `onChange`, which re-applies tool activation and
-status. `disableWrite`/`disableEdit` rows are `visibleWhen` `apply_patch` is
-effectively not `off`; hidden fields stay persisted and effective.
+extension only supplies `onChange`, which re-applies tool registration,
+activation and status. `applyPatchFreeform`/`disableWrite`/`disableEdit` rows
+are `visibleWhen` `apply_patch` is effectively not `off`; hidden fields stay
+persisted and effective.
 
 ## GPT mode
 
@@ -103,11 +105,11 @@ multiplier then inflates displayed cost. API-key `openai` honors `priority`
 
 ## `apply_patch`
 
-`apply-patch.ts`. Schema is `{ input: string }`, but when the model declares
-grammar-tool support the tool is instead emitted as a freeform custom tool
-constrained by Codex's apply-patch Lark grammar, with Pi mapping the streamed
-body back to `input`. Registration is refreshed on session start and model
-select so description and shape match the model.
+`apply-patch.ts`. Schema is `{ input: string }`. When `applyPatchFreeform` is
+enabled and the model declares grammar-tool support, the tool is instead
+emitted as a freeform custom tool constrained by Codex's apply-patch Lark
+grammar, with Pi mapping the streamed body back to `input`. Registration is
+refreshed on config and model changes so description and shape stay aligned.
 
 The prompt deliberately does not restate the patch syntax (models know it, and
 the grammar encodes it); it does push for smaller patches, since an early

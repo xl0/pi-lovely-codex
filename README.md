@@ -38,9 +38,9 @@ GPT models are trained on Codex's `apply_patch`; with Pi's `edit` tool, muscle
 memory shows — silly mistakes creep in. This extension gives them the tool they
 were trained on.
 
-On Pi versions with freeform-tool support, `apply_patch` is an OpenAI custom
-tool constrained by Codex's Lark grammar; elsewhere it's a plain JSON tool
-`{ input: string }`.
+By default, `apply_patch` is a plain JSON tool `{ input: string }`. For models
+that support OpenAI grammar tools, it can instead be a freeform custom tool
+constrained by Codex's Lark grammar.
 
 > Patches are applied by shelling out to `codex --codex-run-as-apply-patch`.
 > **The Codex CLI must be installed and on PATH.**
@@ -49,6 +49,8 @@ Settings:
 
 - `add apply_patch` — `on`, `off`, or `gpt-only` (default: only for model ids
   starting with `gpt-` or containing `/gpt-`).
+- `enable freeform` — use the grammar-constrained custom tool when supported
+  (off by default).
 - `disable write` / `disable edit` — drop the now-redundant built-in tools
   while `apply_patch` is active (off by default); restored after, but never
   beyond what the session started with.

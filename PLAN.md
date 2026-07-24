@@ -11,8 +11,9 @@ Three things matter, in this order:
    must be unaffected. Show the user when they're paying for it.
 2. **A real `apply_patch`.** Codex models expect it, so give them the genuine
    article by delegating to the Codex CLI rather than reimplementing patch
-   semantics. Prefer the grammar-constrained freeform tool where the model
-   supports it. Result rendering should feel like Pi's own `edit`.
+   semantics. Use the conventional JSON shape by default; let users opt into
+   grammar-constrained freeform where supported. Result rendering should
+   feel like Pi's own `edit`.
 3. **Don't fight the model.** When `apply_patch` is live, let the user hide
    `write`/`edit` so the model stops reaching for them — but never enable a
    tool the session didn't already have.
@@ -36,7 +37,7 @@ Everything above is implemented and documented in `CODE.md`.
 - [x] GPT service-tier injection and priority cost adjustment.
 - [x] Benchmark Codex-subscription and API-key service tiers across GPT-5.4,
       5.5, and 5.6 variants; retain raw results, analysis, and chart.
-- [x] `apply_patch` tool, with Lark-grammar freeform variant and JSON fallback.
+- [x] `apply_patch` tool, JSON by default with Lark-grammar freeform opt-in.
 - [x] Tool activation from config, gated on session-start baseline.
 
 Nothing open. No native patch implementation is planned; no automated tests

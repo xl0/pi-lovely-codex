@@ -4,18 +4,50 @@ const CONFIG_FILE_NAME = "xl0-pi-lovely-codex.json"
 
 const codexConfigSchema = {
 	gptMode: field.enum(["default", "fast", "fast-codex"], "default", {
-		label: "GPT mode"
+		label: "GPT mode",
+		description: "Choose where requests use OpenAI's priority service tier.",
+		valueDescriptions: {
+			default: "Do not request priority serving",
+			fast: "Request priority serving from openai and openai-codex",
+			"fast-codex": "Request priority serving from openai-codex only"
+		}
 	}),
 	applyPatchAddMode: field.enum(["on", "off", "gpt-only"], "gpt-only", {
-		label: "add apply_patch"
+		label: "add apply_patch",
+		description: "Control when the Codex-compatible apply_patch tool is active.",
+		valueDescriptions: {
+			on: "Enable for every model",
+			off: "Disable for every model",
+			"gpt-only": "Enable only for GPT model ids"
+		}
+	}),
+	applyPatchFreeform: field.boolean(false, {
+		label: "enable freeform",
+		description: "Use the grammar-constrained custom tool instead of JSON when the model supports it.",
+		valueDescriptions: {
+			on: "Use freeform when supported",
+			off: "Use the JSON input schema"
+		},
+		depth: 1,
+		visibleWhen: ({ get }) => get("applyPatchAddMode") !== "off"
 	}),
 	disableWrite: field.boolean(false, {
 		label: "disable write",
+		description: "Remove the built-in write tool while apply_patch is active.",
+		valueDescriptions: {
+			on: "Remove write",
+			off: "Keep write"
+		},
 		depth: 1,
 		visibleWhen: ({ get }) => get("applyPatchAddMode") !== "off"
 	}),
 	disableEdit: field.boolean(false, {
 		label: "disable edit",
+		description: "Remove the built-in edit tool while apply_patch is active.",
+		valueDescriptions: {
+			on: "Remove edit",
+			off: "Keep edit"
+		},
 		depth: 1,
 		visibleWhen: ({ get }) => get("applyPatchAddMode") !== "off"
 	})

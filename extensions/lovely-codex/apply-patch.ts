@@ -276,7 +276,11 @@ eof_line: "*** End of File" LF
 
 export function registerApplyPatchTool(pi: ExtensionAPI): (supportsFreeform: boolean) => void {
 	const register = (supportsFreeform: boolean) => {
-		pi.registerTool({ ...applyPatchTool, description: supportsFreeform ? FREEFORM_DESCRIPTION : JSON_DESCRIPTION })
+		pi.registerTool({
+			...applyPatchTool,
+			description: supportsFreeform ? FREEFORM_DESCRIPTION : JSON_DESCRIPTION,
+			constrainedSampling: supportsFreeform ? (applyPatchTool.constrainedSampling ?? false) : false
+		})
 	}
 	register(false)
 	pi.on("tool_result", event => {
