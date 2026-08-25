@@ -26,7 +26,7 @@ are peer deps. No automated tests.
 
 ## Config
 
-`config.ts` defines `codexConfigSpec = defineScopedConfig(...)` over five flat
+`config.ts` defines `codexConfigSpec = defineScopedConfig(...)` over seven flat
 optional fields:
 
 | field | values | default |
@@ -78,14 +78,19 @@ Status indicator is `🏎️` (accent) for non-`default` GPT modes, hidden other
   context; while it is active, `view_image` is added unless `viewImage` is off
 
 Restoration is gated on the session-start baseline so the extension can never
-enable a tool the session did not already have.
+enable a tool the session did not already have. `session_shutdown` sets the
+active tools back to that baseline: `/reload` rebuilds the runtime from the
+current active set and a fresh instance re-captures the baseline from it, so
+anything still removed at teardown would otherwise stay gone.
 
-`read-image.ts` registers `view_image` by spreading Pi's `createReadToolDefinition`
-(reusing mime sniff, resize, convert and result rendering) with a path-only
-schema, its own `view_image` call header, and an `execute` that rejects
-non-image extensions and otherwise delegates to a read def bound to `ctx.cwd`. It is active while `read` is disabled and `viewImage` is on — the
-sole way to view images once `read` is gone, since shell reads return bytes,
-not attachments.
+`read-image.ts` registers `view_image`, a path-only tool on Pi's exported
+`detectSupportedImageMimeTypeFromFile`: resolve against `ctx.cwd`, sniff
+(anything that is not an image is refused, whatever its extension), return the
+note + raw base64 attachment. No resize/convert here — Pi normalizes every tool
+result's images as they enter history, honoring the auto-resize setting.
+Result rendering is Pi's fallback. It is active while `read` is disabled and
+`viewImage` is on — the sole way to view images once `read` is gone, since
+shell reads return bytes, not attachments.
 
 ## `/lovely-codex` command
 
@@ -152,9 +157,14 @@ adjacent Pi Lovely packages, Bun as package manager, lockfiles ignored.
 `check` = `tsgo --noEmit` + Biome. `README.md` carries the user-facing docs.
 
 Releases: `CHANGELOG.md` (Keep-a-Changelog style, `[Unreleased]` on top).
-`scripts/release.ts` (`bun run release [patch|minor|major|x.y.z]`) rolls the
-changelog, bumps `package.json`, runs `prepublishOnly` (= `check`), commits,
-tags `v*` and pushes. The tag push triggers `.github/workflows/publish.yml`,
-which verifies the tag, stages on npm with OIDC provenance, and opens a GitHub
-Release from the changelog section; the staged version publishes only after the
-script's manual 2FA approval. Mirrors the grok-mermaid setup.
+`scripts/release.ts` (`bun run release [patch|minor|major|x.y.z] [--no-push]`)
+checks everything first — release files clean (other dirty files are listed
+and left alone), tag absent locally and on origin, master not behind origin,
+version not on npm (only an E404 passes) nor already staged, `[Unreleased]`
+non-empty — runs `prepublishOnly` (= `check`) before touching the tree, then
+rolls the changelog, bumps `package.json`, pauses on the diff for a y/N,
+commits, tags `v*` and pushes (`--no-follow-tags`). The tag push triggers
+`.github/workflows/publish.yml`, which verifies the tag, stages on npm with
+OIDC provenance, and opens a GitHub Release from the changelog section; the
+staged version publishes only after the script's manual 2FA approval. Mirrors
+the grok-mermaid setup plus the pre-write verification and origin/stage checks.
