@@ -77,6 +77,13 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 		}
 	})
 
+	// Reload rebuilds the runtime from the current active set and re-captures the
+	// baseline in a fresh instance, which would then never restore what this
+	// one removed. Hand back the untouched set before the teardown.
+	pi.on("session_shutdown", async () => {
+		pi.setActiveTools(Array.from(editToolBaseline))
+	})
+
 	pi.on("model_select", async event => {
 		selectedModelIsGpt = isGptModel(event.model)
 		selectedModelSupportsFreeform = supportsFreeformTools(event.model)
