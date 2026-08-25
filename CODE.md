@@ -150,3 +150,11 @@ only for multi-file diffs.
 `tsconfig.json` (strict, over `extensions/`), `biome.json` aligned with the
 adjacent Pi Lovely packages, Bun as package manager, lockfiles ignored.
 `check` = `tsgo --noEmit` + Biome. `README.md` carries the user-facing docs.
+
+Releases: `CHANGELOG.md` (Keep-a-Changelog style, `[Unreleased]` on top).
+`scripts/release.ts` (`bun run release [patch|minor|major|x.y.z]`) rolls the
+changelog, bumps `package.json`, runs `prepublishOnly` (= `check`), commits,
+tags `v*` and pushes. The tag push triggers `.github/workflows/publish.yml`,
+which verifies the tag, stages on npm with OIDC provenance, and opens a GitHub
+Release from the changelog section; the staged version publishes only after the
+script's manual 2FA approval. Mirrors the grok-mermaid setup.
