@@ -3,6 +3,7 @@ import { ScopedConfigEditor } from "@xl0/pi-lovely-config"
 import { registerApplyPatchTool } from "./apply-patch.js"
 import { type CodexConfig, codexConfigSpec } from "./config.js"
 import { registerGptModeHooks } from "./gpt-mode.js"
+import { registerReadImageTool } from "./read-image.js"
 
 function isGptModel(model: ExtensionContext["model"]): boolean {
 	return model?.id.startsWith("gpt-") || model?.id.includes("/gpt-") || false
@@ -18,6 +19,7 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 	let selectedModelIsGpt = false
 	let selectedModelSupportsFreeform = false
 	const updateApplyPatchTool = registerApplyPatchTool(pi)
+	registerReadImageTool(pi)
 	const getMode = () => configValue.gptMode
 	const applyToolConfig = () => {
 		updateApplyPatchTool(configValue.applyPatchFreeform && selectedModelSupportsFreeform)
@@ -33,6 +35,16 @@ export default function lovelyCodexExtension(pi: ExtensionAPI) {
 
 		if (hasApplyPatch && configValue.disableEdit) active.delete("edit")
 		else if (editToolBaseline.has("edit")) active.add("edit")
+
+		const disableRead = configValue.disableRead === "on" || (configValue.disableRead === "gpt-only" && selectedModelIsGpt)
+		if (disableRead) {
+			active.delete("read")
+			if (configValue.viewImage) active.add("view_image")
+			else active.delete("view_image")
+		} else {
+			active.delete("view_image")
+			if (editToolBaseline.has("read")) active.add("read")
+		}
 
 		pi.setActiveTools(Array.from(active))
 	}

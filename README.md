@@ -54,6 +54,11 @@ Settings:
 - `disable write` / `disable edit` — drop the now-redundant built-in tools
   while `apply_patch` is active (off by default); restored after, but never
   beyond what the session started with.
+- `disable read` — `on`, `off`, or `gpt-only` (default: only for GPT model
+  ids, independent of `apply_patch`). Forces bounded shell reads (`sed -n`/
+  `head`) instead of whole-file reads, conserving context the way Codex's
+  toolset does. While `read` is gone, a `view_image` tool takes over image
+  reading (which the shell can't provide); turn it off with `add view_image`.
 
 ## Config files
 
