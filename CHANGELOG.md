@@ -5,7 +5,7 @@
 ### Added
 
 - `disable read` setting (`on` / `off` / `gpt-only`, default `gpt-only`): removes the built-in `read` tool so the model falls back to bounded shell reads (`sed -n` / `head`), conserving context the way Codex's toolless design does. Independent of `apply_patch`, unlike `disable write` / `disable edit`.
-- `view_image` tool, active while `read` is disabled (toggle with the `add view_image` setting, default on): preserves image reading (which shell reads can't do) by reusing Pi's read tool restricted to image files.
+- `view_image` tool, active while `read` is disabled (toggle with the `add view_image` setting, default on): preserves image reading (which shell reads can't do). Images are recognized by content, not extension; anything else is refused.
 
 ## [0.2.1] - 2026-08-13
 
