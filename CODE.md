@@ -18,6 +18,7 @@ State below describes the current codebase, not history.
 - `config.ts`: scoped config spec
 - `gpt-mode.ts`: service-tier request hooks and cost adjustment
 - `apply-patch.ts`: the `apply_patch` tool
+- `read-image.ts`: `view_image`, an image-only stand-in for `read`
 
 Published as ESM `@xl0/pi-lovely-codex`; Pi discovers entrypoints via
 `pi.extensions`. Runtime dep `@xl0/pi-lovely-config` (plus typebox); Pi packages
@@ -35,6 +36,8 @@ optional fields:
 | `applyPatchFreeform` | boolean | `false` |
 | `disableWrite` | boolean | `false` |
 | `disableEdit` | boolean | `false` |
+| `disableRead` | `on` / `off` / `gpt-only` | `gpt-only` |
+| `viewImage` | boolean | `true` |
 
 Scopes are User (`~/.pi/agent/xl0-pi-lovely-codex.json`) and Workspace
 (`<cwd>/.pi/...`); Workspace shallow-overrides User. Omitted means unset in
@@ -70,9 +73,19 @@ Status indicator is `🏎️` (accent) for non-`default` GPT modes, hidden other
   starts with `gpt-` or contains `/gpt-`
 - `disableWrite` / `disableEdit` remove `write` / `edit`, but *only while
   `apply_patch` is active*; otherwise they are restored
+- `disableRead` removes `read` when `on`, or `gpt-only` and the model is GPT
+  (independent of `apply_patch`), forcing bounded shell reads to conserve
+  context; while it is active, `view_image` is added unless `viewImage` is off
 
 Restoration is gated on the session-start baseline so the extension can never
 enable a tool the session did not already have.
+
+`read-image.ts` registers `view_image` by spreading Pi's `createReadToolDefinition`
+(reusing mime sniff, resize, convert and result rendering) with a path-only
+schema, its own `view_image` call header, and an `execute` that rejects
+non-image extensions and otherwise delegates to a read def bound to `ctx.cwd`. It is active while `read` is disabled and `viewImage` is on — the
+sole way to view images once `read` is gone, since shell reads return bytes,
+not attachments.
 
 ## `/lovely-codex` command
 
@@ -81,8 +94,9 @@ TUI-only (ignored in other modes). Reloads config, then hands
 supplies the tabbed User/Workspace UI, per-field writes, and reset. The
 extension only supplies `onChange`, which re-applies tool registration,
 activation and status. `applyPatchFreeform`/`disableWrite`/`disableEdit` rows
-are `visibleWhen` `apply_patch` is effectively not `off`; hidden fields stay
-persisted and effective.
+are `visibleWhen` `apply_patch` is effectively not `off`; `disableRead` is
+always visible, and `viewImage` shows only when `disableRead` is not `off`.
+Hidden fields stay persisted and effective.
 
 ## GPT mode
 

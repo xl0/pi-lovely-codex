@@ -50,6 +50,25 @@ const codexConfigSchema = {
 		},
 		depth: 1,
 		visibleWhen: ({ get }) => get("applyPatchAddMode") !== "off"
+	}),
+	disableRead: field.enum(["on", "off", "gpt-only"], "gpt-only", {
+		label: "disable read",
+		description: "Remove the built-in read tool, forcing bounded shell reads (sed/head) to save context.",
+		valueDescriptions: {
+			on: "Remove read for every model",
+			off: "Keep read",
+			"gpt-only": "Remove read only for GPT model ids"
+		}
+	}),
+	viewImage: field.boolean(true, {
+		label: "add view_image",
+		description: "Add the view_image tool while read is disabled, so images stay readable.",
+		valueDescriptions: {
+			on: "Add view_image",
+			off: "No image tool"
+		},
+		depth: 1,
+		visibleWhen: ({ get }) => get("disableRead") !== "off"
 	})
 } as const
 
