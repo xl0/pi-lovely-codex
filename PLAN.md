@@ -17,6 +17,8 @@ Three things matter, in this order:
 3. **Don't fight the model.** When `apply_patch` is live, let the user hide
    `write`/`edit` so the model stops reaching for them — but never enable a
    tool the session didn't already have.
+4. **Conserve context like Codex does.** Optionally take `read` away so the
+   model uses bounded shell reads, keeping only an image-reading stand-in.
 
 Configuration is scoped (User, Workspace-overrides-User), edited from a single
 no-arg `/lovely-codex` TUI command, and tolerant of files it didn't write:
@@ -38,7 +40,11 @@ Everything above is implemented and documented in `CODE.md`.
 - [x] Benchmark Codex-subscription and API-key service tiers across GPT-5.4,
       5.5, and 5.6 variants; retain raw results, analysis, and chart.
 - [x] `apply_patch` tool, JSON by default with Lark-grammar freeform opt-in.
-- [x] Tool activation from config, gated on session-start baseline.
+- [x] Tool activation from config, gated on session-start baseline, restored
+      on `session_shutdown` so `/reload` can't ratchet tools away.
+- [x] `disable read` + `view_image` (on Pi's exported sniff/process helpers);
+      changelog, release script, publish CI.
+- [ ] Skills section survives a missing `read` — pending pi PR.
 
-Nothing open. No native patch implementation is planned; no automated tests
-are kept in this package.
+No native patch implementation is planned; no automated tests are kept in
+this package.
