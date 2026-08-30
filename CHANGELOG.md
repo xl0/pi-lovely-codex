@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-30
+
 ### Added
 
 - `disable read` setting (`on` / `off` / `gpt-only`, default `gpt-only`): removes the built-in `read` tool so the model falls back to bounded shell reads (`sed -n` / `head`), conserving context the way Codex's toolless design does. Independent of `apply_patch`, unlike `disable write` / `disable edit`.
