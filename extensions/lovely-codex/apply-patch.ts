@@ -23,6 +23,7 @@ interface ApplyPatchCommandResult {
 interface ApplyPatchToolDetails extends ApplyPatchCommandResult {
 	diff?: string
 	patch?: string
+	input?: string
 	firstChangedLine?: number
 }
 
@@ -225,7 +226,7 @@ eof_line: "*** End of File" LF
 			return { result, diffDetails: buildDiff(before, after) }
 		})
 		if (result.exitCode !== 0) {
-			failureDetails.set(toolCallId, { ...result, ...diffDetails })
+			failureDetails.set(toolCallId, { ...result, ...diffDetails, input: params.input })
 			const diffOutput = diffDetails.diff ? `\n\nPartial changes:\n${diffDetails.diff}` : ""
 			throw new Error((result.output || `apply_patch failed with exit code ${result.exitCode}`) + diffOutput)
 		}
@@ -241,13 +242,17 @@ eof_line: "*** End of File" LF
 			}
 		}
 	},
-	renderResult(result, _options, _theme, context) {
+	renderResult(result, _options, theme, context) {
 		const component = new Container()
 		component.clear()
 		if (context.isError) {
 			const details = result.details as ApplyPatchToolDetails | undefined
-			if (details?.exitCode !== undefined) {
+			if (details?.exitCode !== undefined || details?.input !== undefined) {
 				component.addChild(new Spacer(1))
+				if (details?.input) {
+					component.addChild(new Text(renderApplyPatchInput(details.input, theme), 0, 0))
+					component.addChild(new Spacer(1))
+				}
 				if (details.output) {
 					component.addChild(new Text(trimTrailingNewline(details.output), 0, 0))
 				}
