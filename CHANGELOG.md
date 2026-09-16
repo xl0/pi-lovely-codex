@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-09-16
+
 ### Fixed
 
 - `apply_patch` passes `CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS=1` to the Codex CLI subprocess, so patches to CRLF files preserve their line endings instead of rewriting the whole file as LF.
