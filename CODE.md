@@ -22,7 +22,10 @@ State below describes the current codebase, not history.
 
 Published as ESM `@xl0/pi-lovely-codex`; Pi discovers entrypoints via
 `pi.extensions`. Runtime dep `@xl0/pi-lovely-config` (plus typebox); Pi packages
-are peer deps. No automated tests.
+are peer deps. `bun-types` is a dev dep for the regression test (see below).
+Dev links the live Pi packages out of `../pi-mono/packages` (`ai`,
+`coding-agent`, `tui`) via `bun link`, so typecheck/tests track pi-mono HEAD
+(currently 0.85.1) rather than stale registry copies.
 
 ## Config
 
@@ -138,8 +141,13 @@ Execution parses touched paths from the envelope, acquires Pi's file mutation
 queues in sorted absolute-path order, snapshots before/after, and shells out to
 `codex --codex-run-as-apply-patch <input>` in `ctx.cwd`, with
 `CMUX_CODEX_HOOKS_DISABLED=1` to prevent terminal wrappers injecting session
-arguments. Semantics are delegated to the Codex CLI; no native parser is
-planned.
+arguments and `CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS=1` so patches to CRLF
+files keep their line endings instead of rewriting the file as LF. Semantics
+are delegated to the Codex CLI; no native parser is planned.
+
+One regression test (`test/apply-patch.test.ts`, run via `bun test` as part of
+`check`): a fake `codex` on `PATH` observes the real spawn env and asserts
+both variables are passed through.
 
 Success returns `stdout + stderr`. Failure throws the combined output plus a
 partial-change diff when one exists — the thrown text is what the LLM sees,
@@ -152,9 +160,11 @@ only for multi-file diffs.
 
 ## Tooling and docs
 
-`tsconfig.json` (strict, over `extensions/`), `biome.json` aligned with the
-adjacent Pi Lovely packages, Bun as package manager, lockfiles ignored.
-`check` = `tsgo --noEmit` + Biome. `README.md` carries the user-facing docs.
+`tsconfig.json` (strict, over `extensions/`), `biome.json` (`**` with `!!`
+force-ignores for `.claude`/`.git`/`.pi`/`node_modules` so the scanner never
+descends into them), Bun as package manager, lockfiles ignored.
+`check` = `tsgo --noEmit` + `bun test` + Biome. `README.md` carries the
+user-facing docs.
 
 Releases: `CHANGELOG.md` (Keep-a-Changelog style, `[Unreleased]` on top).
 `scripts/release.ts` (`bun run release [patch|minor|major|x.y.z] [--no-push]`)

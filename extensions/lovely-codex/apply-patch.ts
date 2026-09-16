@@ -137,11 +137,15 @@ async function withTouchedFileMutationQueues<T>(cwd: string, touchedPaths: strin
 	return queued()
 }
 
-async function runCodexApplyPatch(cwd: string, input: string): Promise<ApplyPatchCommandResult> {
+export async function runCodexApplyPatch(cwd: string, input: string): Promise<ApplyPatchCommandResult> {
 	return new Promise((resolve, reject) => {
 		const child = spawn("codex", ["--codex-run-as-apply-patch", input], {
 			cwd,
-			env: { ...process.env, CMUX_CODEX_HOOKS_DISABLED: "1" },
+			env: {
+				...process.env,
+				CMUX_CODEX_HOOKS_DISABLED: "1",
+				CODEX_APPLY_PATCH_PRESERVE_LINE_ENDINGS: "1"
+			},
 			stdio: ["ignore", "pipe", "pipe"]
 		})
 		let stdout = ""

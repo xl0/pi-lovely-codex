@@ -47,4 +47,5 @@ Everything above is implemented and documented in `CODE.md`.
 - [ ] Skills section survives a missing `read` — pending pi PR.
 
 No native patch implementation is planned; no automated tests are kept in
-this package.
+this package — except one regression test pinning the apply_patch subprocess
+env (gh #15).

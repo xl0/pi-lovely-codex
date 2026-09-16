@@ -32,7 +32,8 @@
 	],
 	"scripts": {
 		"typecheck": "tsgo --noEmit",
-		"check": "bun run typecheck && bun run biome:check",
+		"test": "bun test",
+		"check": "bun run typecheck && bun run test && bun run biome:check",
 		"prepublishOnly": "bun run check",
 		"release": "bun run scripts/release.ts",
 		"lint": "biome lint .",
@@ -47,6 +48,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.14",
 		"@typescript/native-preview": "^7.0.0-dev.20260502.1",
+		"bun-types": "^1.4.2",
 		"typescript": "^6.0.3"
 	},
 	"peerDependencies": {
