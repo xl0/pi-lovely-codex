@@ -21,8 +21,9 @@ State below describes the current codebase, not history.
 - `read-image.ts`: `view_image`, an image-only stand-in for `read`
 
 Published as ESM `@xl0/pi-lovely-codex`; Pi discovers entrypoints via
-`pi.extensions`. Runtime dep `@xl0/pi-lovely-config` (plus typebox); Pi packages
-are peer deps. `bun-types` is a dev dep for the regression test (see below).
+`pi.extensions`. Runtime dep `@xl0/pi-lovely-config`; Pi packages and typebox
+(host-provided by Pi) are `"*"` peer deps. `bun-types` is a dev dep for the
+regression test (see below).
 Dev links the live Pi packages out of `../pi-mono/packages` (`ai`,
 `coding-agent`, `tui`) via `bun link`, so typecheck/tests track pi-mono HEAD
 (currently 0.85.1) rather than stale registry copies.

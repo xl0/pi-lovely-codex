@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Declare `typebox` as a `"*"` peer dependency instead of a runtime dependency. Pi provides it to extensions and now warns about host-provided packages listed in `dependencies` because an installed copy can bypass the extension loader and create duplicate runtime modules.
+
 ## [0.2.3] - 2026-09-16
 
 ### Fixed
