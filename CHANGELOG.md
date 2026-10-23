@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Declare host-provided `typebox` as a peer dependency to avoid Pi's extension package warning and duplicate runtime modules.
+
 ## [0.2.3] - 2026-09-16
 
 ### Fixed
