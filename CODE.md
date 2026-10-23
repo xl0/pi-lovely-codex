@@ -26,7 +26,7 @@ and `typebox` are `"*"` peer deps. `bun-types` is a dev dep for the regression
 test (see below).
 Dev links the live Pi packages out of `../pi-mono/packages` (`ai`,
 `coding-agent`, `tui`) via `bun link`, so typecheck/tests track pi-mono HEAD
-(currently 0.85.1) rather than stale registry copies.
+rather than stale registry copies.
 
 ## Config
 
@@ -120,11 +120,22 @@ model id starting `gpt-`) so other OpenAI-compatible providers are untouched.
 `message_end` adjusts priority pricing on finalized `openai-codex` assistant
 messages; the plain `openai` provider keeps Pi's native pricing.
 
-Verified 2026-07-21: Codex subscription backend accepts `service_tier:
-"priority"` but processes at default tier (response echoes `default`, no
-throughput gain) unless the account has Fast mode credits — the `message_end`
-multiplier then inflates displayed cost. API-key `openai` honors `priority`
-(echoed on every request, measurable latency gains on most models).
+Short generation probes on 2026-09-19 found higher Codex throughput with
+priority and Pi's normal identity on the tested account. Median GPT-5.5 decode
+speed was 56→85 tokens/s on SSE and WebSocket (three runs per arm/transport);
+GPT-6 Astra was 34→64 on SSE (two runs per arm). Changing `originator` to
+`codex_cli_rs`, adding `x-codex-routing-hint`, or both gave no measurable
+additional gain. All 48 completions still reported `default`: that response
+field alone does not establish whether priority was honored. These probes do
+not establish behavior for other accounts/workloads or measure actual billing.
+
+Six further calls through the real extension hook and Pi transport confirmed
+priority injection, without exercising the full interactive lifecycle. No
+identity override or provider replacement is justified by these results.
+Current Pi allows model/caller headers to override its default `originator: pi`;
+this extension only changes the request body. Local-only investigation and
+artifacts: `.pi/fast-mode-investigation.md`, `.pi/probe-codex-fast-mode.ts`,
+`.pi/probe-fast-hook.ts`, `.pi/codex-fast-*.jsonl`.
 
 ## `apply_patch`
 

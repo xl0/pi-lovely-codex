@@ -28,9 +28,9 @@ Sends `service_tier: "priority"` to request priority serving:
 
 GPT models on those two providers only. Fast mode shows 🏎️ in the status line.
 
-> On the Codex subscription, `priority` is silently ignored unless your account
-> has Fast mode credits. On the OpenAI API it needs priority processing enabled
-> for your org.
+> Availability and billing depend on your account and model. Codex responses
+> can report `service_tier: "default"` even when priority measurably increases
+> throughput; that field alone does not tell you whether Fast mode worked.
 
 ### `apply_patch`
 

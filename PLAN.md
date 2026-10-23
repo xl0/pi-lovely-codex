@@ -3,12 +3,12 @@
 ## Intent
 
 `@xl0/pi-lovely-codex` makes Pi behave well against OpenAI Codex models.
-Three things matter, in this order:
+Four things matter, in this order:
 
-1. **Speed on demand.** Let the user pay for OpenAI's priority tier per
+1. **Speed on demand.** Let the user request OpenAI's priority tier per
    user/workspace, and either everywhere or only for `openai-codex`. Never
    touch requests that aren't OpenAI GPT — other OpenAI-compatible providers
-   must be unaffected. Show the user when they're paying for it.
+   must be unaffected. Show the user when priority is requested.
 2. **A real `apply_patch`.** Codex models expect it, so give them the genuine
    article by delegating to the Codex CLI rather than reimplementing patch
    semantics. Use the conventional JSON shape by default; let users opt into
@@ -37,8 +37,9 @@ Everything above is implemented and documented in `CODE.md`.
 - [x] Scoped config + `/lovely-codex` editor, extracted into
       `@xl0/pi-lovely-config` and consumed via `bun link` during development.
 - [x] GPT service-tier injection and priority cost adjustment.
-- [x] Benchmark Codex-subscription and API-key service tiers across GPT-5.4,
-      5.5, and 5.6 variants; retain raw results, analysis, and chart.
+- [x] Benchmark service tiers and isolate Codex identity headers. Priority
+      improved throughput with Pi identity on the tested account/models;
+      no runtime change justified. Results and limitations are in `CODE.md`.
 - [x] `apply_patch` tool, JSON by default with Lark-grammar freeform opt-in.
 - [x] Tool activation from config, gated on session-start baseline, restored
       on `session_shutdown` so `/reload` can't ratchet tools away.
