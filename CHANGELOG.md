@@ -2,11 +2,10 @@
 
 ## [Unreleased]
 
-## [0.2.4] - 2026-10-23
-
 ### Fixed
 
 - Declare host-provided `typebox` as a peer dependency to avoid Pi's extension package warning and duplicate runtime modules.
+- Pin Biome to the locally verified version so CI uses the same formatting checks.
 
 ## [0.2.3] - 2026-09-16
 

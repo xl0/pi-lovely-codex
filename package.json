@@ -45,7 +45,7 @@
 		"@xl0/pi-lovely-config": "^0.1.0"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.4.14",
+		"@biomejs/biome": "2.5.0",
 		"@typescript/native-preview": "^7.0.0-dev.20260502.1",
 		"bun-types": "^1.4.2",
 		"typescript": "^6.0.3"

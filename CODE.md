@@ -175,8 +175,8 @@ only for multi-file diffs.
 `tsconfig.json` (strict, over `extensions/`), `biome.json` (`**` with `!!`
 force-ignores for `.claude`/`.git`/`.pi`/`node_modules` so the scanner never
 descends into them), Bun as package manager, lockfiles ignored.
-`check` = `tsgo --noEmit` + `bun test` + Biome. `README.md` carries the
-user-facing docs.
+`check` = `tsgo --noEmit` + `bun test` + Biome (pinned to 2.5.0 so local and
+CI formatting checks agree). `README.md` carries the user-facing docs.
 
 Releases: `CHANGELOG.md` (Keep-a-Changelog style, `[Unreleased]` on top).
 `scripts/release.ts` (`bun run release [patch|minor|major|x.y.z] [--no-push]`)
